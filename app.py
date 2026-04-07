@@ -29,7 +29,7 @@ def load_env_file():
 
 load_env_file()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
@@ -618,6 +618,18 @@ def get_attendance():
         return json_error("Unable to load attendance records right now.", 500)
     finally:
         close_db(conn, cursor, rollback=False)
+
+
+# Serve static files and HTML pages
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    if path != "" and os.path.exists(os.path.join('.', path)):
+        return app.send_static_file(path)
+    return json_error("Not found", 404)
 
 
 if __name__ == "__main__":
