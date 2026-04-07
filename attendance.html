@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance - Student Attendance System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="auth.js"></script>
+  <script>
+    window.requireAuth()
+  </script>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h3><i class="fas fa-graduation-cap me-2"></i>Attendance</h3>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="dashboard.html"><i class="fas fa-home"></i>Dashboard</a></li>
+      <li><a href="students.html"><i class="fas fa-users"></i>Students</a></li>
+      <li><a href="attendance.html"><i class="fas fa-clipboard-check"></i>Attendance</a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i>Reports</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="navbar">
+      <div class="navbar-left">
+        <button class="menu-toggle" aria-label="Toggle navigation">
+          <i class="fas fa-bars"></i>
+        </button>
+        <h5 class="mb-0">Attendance</h5>
+      </div>
+      <div class="navbar-right">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <span id="userName">Admin</span>
+        </div>
+        <button class="btn btn-outline-danger btn-sm logout-btn" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="content-area">
+      <div class="page-header">
+        <h1>Mark Attendance</h1>
+        <p>Load a date and subject, then update attendance without creating duplicate records.</p>
+      </div>
+
+      <div id="attendanceAlert" class="alert alert-danger d-none" role="alert"></div>
+
+      <div class="card mb-4">
+        <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+          <div>
+            <h5>Attendance Setup</h5>
+            <p class="mb-0 text-muted">Changing the date or subject reloads any saved attendance for that session.</p>
+          </div>
+          <button class="btn btn-outline-secondary" onclick="resetAttendance()">
+            <i class="fas fa-redo me-2"></i>Reset
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row gy-3">
+            <div class="col-md-4">
+              <label for="attendanceDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="attendanceDate">
+            </div>
+            <div class="col-md-4">
+              <label for="subjectSelect" class="form-label">Subject</label>
+              <select class="form-select" id="subjectSelect">
+                <option value="">Select subject</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="English">English</option>
+                <option value="Science">Science</option>
+                <option value="History">History</option>
+                <option value="Computer Science">Computer Science</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label d-block">&nbsp;</label>
+              <button class="btn btn-primary w-100" id="submitAttendanceBtn" onclick="submitAttendance()">
+                <i class="fas fa-paper-plane me-2"></i>Save Attendance
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+          <div>
+            <h5>Student List</h5>
+            <p class="mb-0 text-muted">Use Present, Late, or Absent for each student.</p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <span class="badge bg-success" id="presentCount">Present: 0</span>
+            <span class="badge bg-warning text-dark" id="lateCount">Late: 0</span>
+            <span class="badge bg-danger" id="absentCount">Absent: 0</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row mb-3 gy-3">
+            <div class="col-md-6">
+              <input type="text" class="form-control shadow-sm" id="searchStudent" placeholder="Search by name or roll number">
+            </div>
+            <div class="col-md-6 text-md-end">
+              <span class="text-muted" id="studentCount">Showing 0 students</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Roll No</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="attendanceTable">
+                <tr>
+                  <td colspan="3" class="text-center py-5 text-muted">Loading students...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let students = []
+    const attendanceState = {}
+
+    function setAlert(message = "", type = "danger") {
+      const alertBox = document.getElementById("attendanceAlert")
+      if (!message) {
+        alertBox.textContent = ""
+        alertBox.className = "alert alert-danger d-none"
+        return
+      }
+
+      alertBox.textContent = message
+      alertBox.className = `alert alert-${type}`
+    }
+
+    function setSubmitState(isSaving) {
+      const button = document.getElementById("submitAttendanceBtn")
+      button.disabled = isSaving
+      button.innerHTML = isSaving
+        ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...'
+        : '<i class="fas fa-paper-plane me-2"></i>Save Attendance'
+    }
+
+    function updateSummary() {
+      const currentStatuses = students.map(student => attendanceState[student.id] || "absent")
+      const presentCount = currentStatuses.filter(status => status === "present").length
+      const lateCount = currentStatuses.filter(status => status === "late").length
+      const absentCount = currentStatuses.filter(status => status === "absent").length
+
+      document.getElementById("presentCount").textContent = `Present: ${presentCount}`
+      document.getElementById("lateCount").textContent = `Late: ${lateCount}`
+      document.getElementById("absentCount").textContent = `Absent: ${absentCount}`
+    }
+
+    function renderAttendanceTable(list = students) {
+      const tableBody = document.getElementById("attendanceTable")
+      const countNode = document.getElementById("studentCount")
+
+      countNode.textContent = list.length === students.length
+        ? `Showing ${students.length} student${students.length === 1 ? "" : "s"}`
+        : `Showing ${list.length} of ${students.length} students`
+
+      if (list.length === 0) {
+        const searchQuery = document.getElementById("searchStudent").value.trim()
+        tableBody.innerHTML = searchQuery
+          ? '<tr><td colspan="3" class="text-center py-5 text-muted">No students match your search.</td></tr>'
+          : '<tr><td colspan="3" class="text-center py-5 text-muted">No students found. Add students first.</td></tr>'
+        return
+      }
+
+      tableBody.innerHTML = list.map(student => `
+        <tr>
+          <td>${window.escapeHtml(student.name)}</td>
+          <td>${window.escapeHtml(student.roll)}</td>
+          <td>
+            <select class="form-select form-select-sm" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
+              <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
+              <option value="late" ${(attendanceState[student.id] || "absent") === "late" ? "selected" : ""}>Late</option>
+              <option value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "selected" : ""}>Absent</option>
+            </select>
+          </td>
+        </tr>
+      `).join("")
+    }
+
+    function applySearch() {
+      const query = document.getElementById("searchStudent").value.toLowerCase().trim()
+      if (!query) {
+        renderAttendanceTable(students)
+        return
+      }
+
+      const filtered = students.filter(student =>
+        student.name.toLowerCase().includes(query) ||
+        student.roll.toLowerCase().includes(query)
+      )
+
+      renderAttendanceTable(filtered)
+    }
+
+    function resetAttendanceState(defaultStatus = "absent") {
+      Object.keys(attendanceState).forEach(key => delete attendanceState[key])
+      students.forEach(student => {
+        attendanceState[student.id] = defaultStatus
+      })
+      updateSummary()
+    }
+
+    async function loadExistingAttendance() {
+      const date = document.getElementById("attendanceDate").value
+      const subject = document.getElementById("subjectSelect").value
+
+      if (!students.length) {
+        return
+      }
+
+      resetAttendanceState("absent")
+
+      if (!date || !subject) {
+        applySearch()
+        return
+      }
+
+      try {
+        const records = await window.apiRequest("/attendance", {
+          query: { start_date: date, end_date: date, subject }
+        })
+
+        records.forEach(record => {
+          attendanceState[record.student_id] = record.status
+        })
+
+        updateSummary()
+        applySearch()
+
+        if (records.length > 0) {
+          setAlert(`Loaded ${records.length} saved attendance record${records.length === 1 ? "" : "s"} for ${subject} on ${window.formatDate(date)}.`, "info")
+        } else {
+          setAlert("", "danger")
+        }
+      } catch (error) {
+        applySearch()
+        setAlert(error.message || "Unable to load saved attendance for this session.")
+      }
+    }
+
+    async function loadStudents() {
+      setAlert("")
+      document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">Loading students...</td></tr>'
+
+      try {
+        students = await window.apiRequest("/students")
+        resetAttendanceState("absent")
+        await loadExistingAttendance()
+      } catch (error) {
+        document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">Unable to load student list right now.</td></tr>'
+        setAlert(error.message || "Unable to load students right now.")
+      }
+    }
+
+    window.updateAttendanceStatus = function(studentId, status) {
+      attendanceState[studentId] = status
+      updateSummary()
+    }
+
+    window.resetAttendance = function() {
+      document.getElementById("attendanceDate").value = window.getTodayLocalDate()
+      document.getElementById("subjectSelect").selectedIndex = 0
+      document.getElementById("searchStudent").value = ""
+      resetAttendanceState("absent")
+      renderAttendanceTable(students)
+      setAlert("")
+    }
+
+    window.submitAttendance = async function() {
+      const date = document.getElementById("attendanceDate").value
+      const subject = document.getElementById("subjectSelect").value
+
+      if (!date || !subject) {
+        setAlert("Please select both a date and a subject before saving attendance.")
+        return
+      }
+
+      if (!students.length) {
+        setAlert("No students are available yet. Add students first.")
+        return
+      }
+
+      setAlert("")
+      setSubmitState(true)
+
+      try {
+        const records = students.map(student => ({
+          student_id: Number(student.id),
+          date,
+          subject,
+          status: attendanceState[student.id] || "absent"
+        }))
+
+        const result = await window.apiRequest("/attendance", {
+          method: "POST",
+          body: records
+        })
+
+        await loadExistingAttendance()
+        setAlert(
+          `${result.message || "Attendance saved."} Created: ${result.created || 0}, updated: ${result.updated || 0}.`,
+          "success"
+        )
+      } catch (error) {
+        setAlert(error.message || "Unable to save attendance right now.")
+      } finally {
+        setSubmitState(false)
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      window.populateUserInfo()
+      window.setupSidebar()
+      document.getElementById("attendanceDate").value = window.getTodayLocalDate()
+      document.getElementById("searchStudent").addEventListener("input", applySearch)
+      document.getElementById("attendanceDate").addEventListener("change", loadExistingAttendance)
+      document.getElementById("subjectSelect").addEventListener("change", loadExistingAttendance)
+      loadStudents()
+    })
+  </script>
+</body>
+</html>

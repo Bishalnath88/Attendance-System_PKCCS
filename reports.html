@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - Student Attendance System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="auth.js"></script>
+  <script>
+    window.requireAuth()
+  </script>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h3><i class="fas fa-graduation-cap me-2"></i>Attendance</h3>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="dashboard.html"><i class="fas fa-home"></i>Dashboard</a></li>
+      <li><a href="students.html"><i class="fas fa-users"></i>Students</a></li>
+      <li><a href="attendance.html"><i class="fas fa-clipboard-check"></i>Attendance</a></li>
+      <li><a href="reports.html"><i class="fas fa-chart-bar"></i>Reports</a></li>
+    </ul>
+  </div>
+
+  <div class="main-content">
+    <div class="navbar">
+      <div class="navbar-left">
+        <button class="menu-toggle" aria-label="Toggle navigation">
+          <i class="fas fa-bars"></i>
+        </button>
+        <h5 class="mb-0">Reports</h5>
+      </div>
+      <div class="navbar-right">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <span id="userName">Admin</span>
+        </div>
+        <button class="btn btn-outline-danger btn-sm logout-btn" onclick="logout()">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </div>
+
+    <div class="content-area">
+      <div class="page-header">
+        <h1>Attendance Reports</h1>
+        <p>Analyze attendance trends by date range and subject.</p>
+      </div>
+
+      <div id="reportAlert" class="alert alert-danger d-none" role="alert"></div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5>Report Filters</h5>
+        </div>
+        <div class="card-body">
+          <div class="row gy-3">
+            <div class="col-md-4">
+              <label for="startDate" class="form-label">Start Date</label>
+              <input type="date" class="form-control" id="startDate">
+            </div>
+            <div class="col-md-4">
+              <label for="endDate" class="form-label">End Date</label>
+              <input type="date" class="form-control" id="endDate">
+            </div>
+            <div class="col-md-4">
+              <label for="reportSubject" class="form-label">Subject</label>
+              <select class="form-select" id="reportSubject">
+                <option value="">All Subjects</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mt-3 g-3">
+            <div class="col-12 col-sm-6">
+              <button class="btn btn-primary w-100" id="generateReportBtn" onclick="generateReport()">
+                <i class="fas fa-chart-line me-2"></i>Generate Report
+              </button>
+            </div>
+            <div class="col-12 col-sm-6">
+              <button class="btn btn-outline-secondary w-100" onclick="resetFilters()">
+                <i class="fas fa-rotate-left me-2"></i>Reset Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5>Attendance Percentage</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container" style="min-height: 320px;">
+            <canvas id="attendanceChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5>Student Attendance Summary</h5>
+          <button class="btn btn-success btn-sm" onclick="downloadReport()">
+            <i class="fas fa-download me-2"></i>Download CSV
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle" id="reportTable">
+              <thead>
+                <tr>
+                  <th>Roll Number</th>
+                  <th>Name</th>
+                  <th>Class</th>
+                  <th>Total Days</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Late</th>
+                  <th>Attendance %</th>
+                </tr>
+              </thead>
+              <tbody id="reportTableBody">
+                <tr>
+                  <td colspan="8" class="text-center py-4">Select date range and click Generate Report.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-4">
+          <div class="card">
+            <div class="card-header">
+              <h5>Top Performing Students</h5>
+            </div>
+            <div class="card-body">
+              <div id="topStudents">
+                <p class="text-muted text-center mb-0">Generate a report to see top-performing students.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+          <div class="card">
+            <div class="card-header">
+              <h5>Students Needing Attention</h5>
+            </div>
+            <div class="card-body">
+              <div id="lowAttendance">
+                <p class="text-muted text-center mb-0">Generate a report to see students with low attendance.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    let students = []
+    let allAttendanceRecords = []
+    let reportData = []
+    let attendanceChart = null
+
+    function setAlert(message = "", type = "danger") {
+      const alertBox = document.getElementById("reportAlert")
+      if (!message) {
+        alertBox.textContent = ""
+        alertBox.className = "alert alert-danger d-none"
+        return
+      }
+
+      alertBox.textContent = message
+      alertBox.className = `alert alert-${type}`
+    }
+
+    function setGenerateButtonState(isLoading) {
+      const button = document.getElementById("generateReportBtn")
+      button.disabled = isLoading
+      button.innerHTML = isLoading
+        ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generating...'
+        : '<i class="fas fa-chart-line me-2"></i>Generate Report'
+    }
+
+    function getDefaultDateRange() {
+      const today = new Date()
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+      const timezoneOffset = today.getTimezoneOffset() * 60000
+
+      return {
+        start: new Date(firstDayOfMonth.getTime() - timezoneOffset).toISOString().split("T")[0],
+        end: window.getTodayLocalDate()
+      }
+    }
+
+    function calculateAttendancePercentage(present, late, totalDays) {
+      const attendedDays = present + late
+      return totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 0
+    }
+
+    function loadSubjects() {
+      const reportSubject = document.getElementById("reportSubject")
+      const subjects = [...new Set(allAttendanceRecords.map(record => record.subject).filter(Boolean))].sort()
+      const fallbackSubjects = ["Mathematics", "English", "Science", "History", "Computer Science"]
+      const options = (subjects.length ? subjects : fallbackSubjects).map(subject => `
+        <option value="${window.escapeHtml(subject)}">${window.escapeHtml(subject)}</option>
+      `).join("")
+
+      reportSubject.innerHTML = `<option value="">All Subjects</option>${options}`
+    }
+
+    function displayReport() {
+      const tableBody = document.getElementById("reportTableBody")
+
+      if (reportData.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No data found for the selected filters.</td></tr>'
+        return
+      }
+
+      tableBody.innerHTML = reportData.map(student => {
+        const percentageClass = student.percentage >= 75 ? "text-success" : student.percentage >= 50 ? "text-warning" : "text-danger"
+        return `
+          <tr>
+            <td>${window.escapeHtml(student.rollNumber)}</td>
+            <td>${window.escapeHtml(student.name)}</td>
+            <td>${window.escapeHtml(student.className)}</td>
+            <td>${student.totalDays}</td>
+            <td><span class="badge bg-success">${student.present}</span></td>
+            <td><span class="badge bg-danger">${student.absent}</span></td>
+            <td><span class="badge bg-warning text-dark">${student.late}</span></td>
+            <td><strong class="${percentageClass}">${student.percentage}%</strong></td>
+          </tr>
+        `
+      }).join("")
+    }
+
+    function updateChart(labels = [], data = []) {
+      const context = document.getElementById("attendanceChart").getContext("2d")
+
+      if (!attendanceChart) {
+        attendanceChart = new Chart(context, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [{
+              label: "Attendance %",
+              data,
+              backgroundColor: "rgba(13, 110, 253, 0.75)",
+              borderColor: "rgba(13, 110, 253, 1)",
+              borderWidth: 1,
+              borderRadius: 8,
+              maxBarThickness: 42
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: value => `${value}%`
+                }
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: context => `${context.parsed.y}% attendance`
+                }
+              }
+            }
+          }
+        })
+      } else {
+        attendanceChart.data.labels = labels
+        attendanceChart.data.datasets[0].data = data
+        attendanceChart.update()
+      }
+    }
+
+    function displayTopAndLowStudents() {
+      const topStudentsDiv = document.getElementById("topStudents")
+      const lowAttendanceDiv = document.getElementById("lowAttendance")
+
+      if (reportData.length === 0) {
+        topStudentsDiv.innerHTML = '<p class="text-muted text-center mb-0">No report data available.</p>'
+        lowAttendanceDiv.innerHTML = '<p class="text-muted text-center mb-0">No report data available.</p>'
+        return
+      }
+
+      const sortedDescending = [...reportData].sort((a, b) => b.percentage - a.percentage || a.name.localeCompare(b.name))
+      const sortedAscending = [...reportData].sort((a, b) => a.percentage - b.percentage || a.name.localeCompare(b.name))
+      const topStudents = sortedDescending.slice(0, 5)
+      const lowStudents = sortedAscending.filter(student => student.percentage < 75).slice(0, 5)
+
+      topStudentsDiv.innerHTML = topStudents.map((student, index) => `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
+          <div>
+            <strong>${index + 1}. ${window.escapeHtml(student.name)}</strong>
+            <br>
+            <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.className)}</small>
+          </div>
+          <span class="badge bg-success">${student.percentage}%</span>
+        </div>
+      `).join("")
+
+      lowAttendanceDiv.innerHTML = lowStudents.length > 0
+        ? lowStudents.map(student => `
+          <div class="d-flex justify-content-between align-items-center mb-2 p-2 border-bottom">
+            <div>
+              <strong>${window.escapeHtml(student.name)}</strong>
+              <br>
+              <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.className)}</small>
+            </div>
+            <span class="badge bg-danger">${student.percentage}%</span>
+          </div>
+        `).join("")
+        : '<p class="text-muted text-center mb-0">All students are at or above 75% attendance.</p>'
+    }
+
+    async function loadInitialData() {
+      try {
+        const [studentData, attendanceData] = await Promise.all([
+          window.apiRequest("/students"),
+          window.apiRequest("/attendance")
+        ])
+        students = studentData
+        allAttendanceRecords = attendanceData
+        loadSubjects()
+      } catch (error) {
+        setAlert(error.message || "Unable to load report data right now.")
+      }
+    }
+
+    window.resetFilters = function() {
+      const range = getDefaultDateRange()
+      document.getElementById("startDate").value = range.start
+      document.getElementById("endDate").value = range.end
+      document.getElementById("reportSubject").selectedIndex = 0
+      reportData = []
+      displayReport()
+      updateChart([], [])
+      displayTopAndLowStudents()
+      setAlert("")
+    }
+
+    window.generateReport = async function() {
+      setAlert("")
+
+      const startDate = document.getElementById("startDate").value
+      const endDate = document.getElementById("endDate").value
+      const subject = document.getElementById("reportSubject").value
+
+      if (!startDate || !endDate) {
+        setAlert("Please select both a start date and an end date.")
+        return
+      }
+
+      if (startDate > endDate) {
+        setAlert("Start date cannot be later than end date.")
+        return
+      }
+
+      if (!students.length) {
+        setAlert("No students are available yet. Add students before generating reports.")
+        return
+      }
+
+      setGenerateButtonState(true)
+
+      try {
+        const filteredAttendance = await window.apiRequest("/attendance", {
+          query: {
+            start_date: startDate,
+            end_date: endDate,
+            subject
+          }
+        })
+
+        reportData = students.map(student => {
+          const studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(student.id))
+          const totalDays = studentAttendance.length
+          const present = studentAttendance.filter(record => record.status === "present").length
+          const absent = studentAttendance.filter(record => record.status === "absent").length
+          const late = studentAttendance.filter(record => record.status === "late").length
+          const percentage = calculateAttendancePercentage(present, late, totalDays)
+
+          return {
+            rollNumber: student.roll || "-",
+            name: student.name,
+            className: student.class || "-",
+            totalDays,
+            present,
+            absent,
+            late,
+            percentage
+          }
+        }).sort((a, b) => b.percentage - a.percentage || a.name.localeCompare(b.name))
+
+        displayReport()
+        updateChart(
+          reportData.map(student => student.name),
+          reportData.map(student => student.percentage)
+        )
+        displayTopAndLowStudents()
+
+        if (filteredAttendance.length === 0) {
+          setAlert("No attendance records were found for the selected filters.", "info")
+        }
+      } catch (error) {
+        setAlert(error.message || "Unable to generate the report right now.")
+      } finally {
+        setGenerateButtonState(false)
+      }
+    }
+
+    window.downloadReport = function() {
+      if (reportData.length === 0) {
+        setAlert("No report data available to download. Generate a report first.")
+        return
+      }
+
+      const csvRows = [
+        ["Roll Number", "Name", "Class", "Total Days", "Present", "Absent", "Late", "Attendance %"],
+        ...reportData.map(student => [
+          student.rollNumber,
+          student.name,
+          student.className,
+          student.totalDays,
+          student.present,
+          student.absent,
+          student.late,
+          `${student.percentage}%`
+        ])
+      ]
+
+      const csvContent = csvRows
+        .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `attendance_report_${window.getTodayLocalDate()}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      setAlert("Report downloaded successfully.", "success")
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      window.populateUserInfo()
+      window.setupSidebar()
+      resetFilters()
+      await loadInitialData()
+    })
+  </script>
+</body>
+</html>
