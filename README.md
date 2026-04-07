@@ -82,9 +82,9 @@ Or connect your GitHub repo directly in Railway dashboard.
 
 ### 📱 Frontend Configuration
 
-Update `auth.js` if Railway app URL is different:
+✅ Already updated! `auth.js` configured with:
 ```javascript
-const API_BASE_URL = "https://your-railway-app.up.railway.app";
+const API_BASE_URL = "https://attendance-systempkccs-production.up.railway.app";
 ```
 
 ### 🔐 Security Notes
@@ -151,6 +151,6 @@ Frontend and backend must be on same/allowed origins
 
 ---
 
-**Deployment URL:** Check Railway dashboard for your app URL
-**Database Host:** interchange.proxy.rlwy.net
-**Port:** 38999
+**Deployment URL:** https://attendance-systempkccs-production.up.railway.app
+**Database Host:** interchange.proxy.rlwy.net:38999
+**Database Name:** railway

@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 
-from flask import Flask, g, jsonify, request
+from flask import Flask, g, jsonify, request, send_from_directory
 from flask_cors import CORS
 import mysql.connector
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -623,12 +623,15 @@ def get_attendance():
 # Serve static files and HTML pages
 @app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
-    if path != "" and os.path.exists(os.path.join('.', path)):
-        return app.send_static_file(path)
+    if os.path.exists(os.path.join('.', path)):
+        return send_from_directory('.', path)
+    # Try to serve as HTML file if extension missing
+    if os.path.exists(os.path.join('.', path + '.html')):
+        return send_from_directory('.', path + '.html')
     return json_error("Not found", 404)
 
 
