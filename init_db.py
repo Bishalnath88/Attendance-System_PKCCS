@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Database Initialization Script
-Run this script once to create all required tables in Railway MySQL database
-"""
 
 import mysql.connector
 from pathlib import Path
@@ -10,7 +6,6 @@ import os
 import sys
 
 def load_env_file():
-    """Load environment variables from .env file"""
     env_path = Path(__file__).resolve().parent / ".env"
     if not env_path.exists():
         print("❌ .env file not found!")
@@ -29,7 +24,6 @@ def load_env_file():
     return True
 
 def get_db_config():
-    """Get database configuration from environment variables"""
     return {
         "host": os.environ.get("ATTENDANCE_DB_HOST", "localhost"),
         "user": os.environ.get("ATTENDANCE_DB_USER", "root"),
@@ -39,7 +33,6 @@ def get_db_config():
     }
 
 def initialize_database():
-    """Initialize database with required schema"""
     if not load_env_file():
         return False
 
@@ -55,7 +48,6 @@ def initialize_database():
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
         
-        # Create Users Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -67,7 +59,6 @@ def initialize_database():
         """)
         print("✅ Created 'users' table")
         
-        # Create Students Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -84,7 +75,6 @@ def initialize_database():
         """)
         print("✅ Created 'students' table")
         
-        # Create Attendance Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -102,23 +92,29 @@ def initialize_database():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
         print("✅ Created 'attendance' table")
-        
         conn.commit()
         print("\n✨ Database initialization successful!")
         return True
         
     except mysql.connector.Error as err:
+        # Handle database-specific errors
         print(f"\n❌ Database Error: {err}")
         return False
     except Exception as err:
+        # Handle unexpected errors
         print(f"\n❌ Unexpected Error: {err}")
         return False
     finally:
+        # Always close connections
         if cursor:
             cursor.close()
         if conn:
             conn.close()
 
 if __name__ == "__main__":
+    """
+    Entry point - Run database initialization
+    Exit with status code 0 (success) or 1 (failure)
+    """
     success = initialize_database()
     sys.exit(0 if success else 1)

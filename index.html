@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Character encoding -->
   <meta charset="UTF-8">
+  <!-- Viewport for responsive design on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Page title shown in browser tab -->
   <title>Student Attendance System</title>
+  <!-- Load authentication utilities module -->
   <script src="auth.js"></script>
   <script>
+    // ENTRY POINT - Route based on authentication status
+    // If user has token: redirect to dashboard
+    // If no token: redirect to login page
     if (window.getToken()) {
       window.location.replace("dashboard.html")
     } else {
@@ -14,6 +21,7 @@
   </script>
 </head>
 <body>
+  <!-- Loading message shown during redirect -->
   <p>Redirecting...</p>
 </body>
 </html>

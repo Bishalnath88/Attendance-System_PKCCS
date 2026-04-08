@@ -1,121 +1,151 @@
+/* ========== THEME & COLOR VARIABLES ========== */
+/* Define global color scheme using CSS custom properties for easy theming */
 :root {
-  --sidebar-bg: #111827;
-  --sidebar-hover: #1f2937;
-  --main-bg: #eef2ff;
-  --surface: #ffffff;
-  --surface-strong: #f8fafc;
-  --text-primary: #111827;
-  --text-secondary: #64748b;
-  --card-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
-  --border-color: #e2e8f0;
-  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.08);
+  /* Sidebar styling colors */
+  --sidebar-bg: #111827;          /* Dark background for sidebar navigation */
+  --sidebar-hover: #1f2937;       /* Hover state background color */
+  
+  /* Main application background */
+  --main-bg: #eef2ff;             /* Light blue-tinted main background */
+  
+  /* Surface and card colors */
+  --surface: #ffffff;             /* Primary white background for cards/content */
+  --surface-strong: #f8fafc;      /* Slightly gray background alternative */
+  
+  /* Text colors for readability hierarchy */
+  --text-primary: #111827;        /* Dark gray for primary text */
+  --text-secondary: #64748b;      /* Lighter gray for secondary text/hints */
+  
+  /* Shadow effects for depth */
+  --card-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);  /* Card drop shadow */
+  --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.08);  /* Softer ambient shadow */
+  
+  /* Borders and dividers */
+  --border-color: #e2e8f0;        /* Light gray for borders and dividers */
 }
 
+/* ========== GLOBAL STYLES ========== */
+/* Reset default browser styles and apply box model */
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+  box-sizing: border-box;  /* Include padding/border in width/height calculations */
 }
 
+/* ========== BODY STYLES ========== */
+/* Apply global typography and background settings */
 body {
   margin: 0;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;  /* Modern sans-serif font stack */
   padding: 0;
-  background-color: var(--main-bg);
-  color: var(--text-primary);
-  overflow-x: hidden;
+  background-color: var(--main-bg);  /* Use theme background color */
+  color: var(--text-primary);        /* Use theme text color */
+  overflow-x: hidden;                /* Prevent horizontal scrollbar */
 }
 
+/* ========== SIDEBAR NAVIGATION ========== */
+/* Fixed left navigation panel with responsive hide/show on mobile */
 .sidebar {
   position: fixed;
   left: 0;
   top: 0;
-  height: 100vh;
+  height: 100vh;           /* Full viewport height */
   width: 260px;
-  background-color: var(--sidebar-bg);
+  background-color: var(--sidebar-bg);  /* Dark background from theme */
   color: white;
-  transition: all 0.3s ease;
-  z-index: 1000;
-  overflow-y: auto;
-  box-shadow: 10px 0 30px rgba(15, 23, 42, 0.12);
+  transition: all 0.3s ease;             /* Smooth animation for mobile toggle */
+  z-index: 1000;                         /* Ensure sidebar is above other content */
+  overflow-y: auto;                      /* Allow scrolling for long menus */
+  box-shadow: 10px 0 30px rgba(15, 23, 42, 0.12);  /* Right-side drop shadow */
 }
 
+/* Hide sidebar completely on mobile (toggled via JS) */
 .sidebar.active {
-  left: -260px;
+  left: -260px;  /* Slide sidebar off-screen to the left */
 }
 
+/* ========== SIDEBAR HEADER ========== */
+/* Top section of sidebar with application title */
 .sidebar-header {
   padding: 26px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);  /* Subtle divider line */
 }
 
 .sidebar-header h3 {
   margin: 0;
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 700;  /* Bold for prominence */
 }
 
+/* ========== SIDEBAR MENU ========== */
+/* Navigation menu links and hover states */
 .sidebar-menu {
   padding: 20px 0;
-  list-style: none;
+  list-style: none;  /* Remove default list bullets */
 }
 
 .sidebar-menu a {
   display: flex;
   align-items: center;
   padding: 14px 24px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.85);  /* Slightly transparent white */
   text-decoration: none;
   transition: all 0.25s ease;
   font-size: 0.95rem;
-  border-radius: 16px;
+  border-radius: 16px;   /* Rounded corners for modern look */
   margin: 0 12px 8px;
 }
 
 .sidebar-menu a:hover,
 .sidebar-menu a.active {
-  background-color: rgba(148, 163, 184, 0.12);
-  color: #ffffff;
-  transform: translateX(2px);
+  background-color: rgba(148, 163, 184, 0.12);  /* Highlight on hover/active */
+  color: #ffffff;                                /* Full white on hover */
+  transform: translateX(2px);                    /* Subtle slide animation */
 }
 
 .sidebar-menu a i {
   margin-right: 12px;
   font-size: 1.1rem;
   width: 24px;
-  text-align: center;
+  text-align: center;  /* Center align icon */
 }
 
+/* ========== MAIN CONTENT AREA ========== */
+/* Primary content region, adjusts for sidebar */
 .main-content {
-  margin-left: 260px;
-  min-height: 100vh;
-  transition: all 0.3s ease;
+  margin-left: 260px;  /* Leave space for sidebar */
+  min-height: 100vh;   /* Full viewport height */
+  transition: all 0.3s ease;  /* Smooth transition for mobile toggle */
 }
 
 .main-content.active {
-  margin-left: 0;
+  margin-left: 0;  /* No margin on mobile when sidebar is hidden */
 }
 
+/* ========== TOP NAVIGATION BAR ========== */
+/* Horizontal navbar with user info and controls */
 .navbar {
-  background-color: var(--surface);
-  box-shadow: var(--shadow-soft);
+  background-color: var(--surface);        /* White background */
+  box-shadow: var(--shadow-soft);          /* Subtle drop shadow for depth */
   padding: 18px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  flex-wrap: wrap;
-  border-radius: 0 0 24px 24px;
+  flex-wrap: wrap;                         /* Allow wrapping on mobile */
+  border-radius: 0 0 24px 24px;           /* Rounded bottom corners */
 }
 
+/* Left section of navbar with menu toggle and title */
 .navbar-left {
   display: flex;
   align-items: center;
   gap: 20px;
 }
 
+/* Mobile menu toggle button */
 .menu-toggle {
-  background: #eef2ff;
+  background: #eef2ff;                     /* Light background */
   border: none;
   font-size: 1.4rem;
   cursor: pointer;
@@ -127,10 +157,11 @@ body {
 }
 
 .menu-toggle:hover {
-  transform: translateY(-1px);
-  background-color: #dbeafe;
+  transform: translateY(-1px);             /* Subtle press effect */
+  background-color: #dbeafe;               /* Slightly darker on hover */
 }
 
+/* Right section of navbar with user profile */
 .navbar-right {
   display: flex;
   align-items: center;
@@ -139,39 +170,44 @@ body {
   justify-content: flex-end;
 }
 
+/* User information container */
 .user-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
+  min-width: 0;  /* Allow text truncation */
 }
 
 .user-info span {
   max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: hidden;                        /* Hide overflowing text */
+  text-overflow: ellipsis;                 /* Add ... for overflow */
   white-space: nowrap;
 }
 
+/* Circular user avatar with initial */
 .user-avatar {
   width: 42px;
   height: 42px;
-  border-radius: 50%;
-  background-color: #0d6efd;
+  border-radius: 50%;                      /* Perfect circle */
+  background-color: #0d6efd;               /* Blue background */
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  box-shadow: 0 10px 28px rgba(13, 110, 253, 0.18);
+  box-shadow: 0 10px 28px rgba(13, 110, 253, 0.18);  /* Blue glow effect */
 }
 
+/* ========== PAGE CONTENT AREA ========== */
+/* Main content padding and layout */
 .content-area {
-  padding: 34px;
+  padding: 34px;                           /* Inner padding from edges */
 }
 
+/* Page header with title and description */
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 32px;                     /* Space below header */
 }
 
 .page-header h1 {
