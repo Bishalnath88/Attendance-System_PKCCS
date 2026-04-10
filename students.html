@@ -88,7 +88,7 @@
         <div class="card-body">
           <div class="row align-items-center mb-4 gy-3">
             <div class="col-md-7">
-              <input type="text" class="form-control shadow-sm" id="searchInput" placeholder="Search by name, roll number, class, or email">
+              <input type="text" class="form-control shadow-sm" id="searchInput" placeholder="Search by name, roll number, course, or email">
             </div>
             <div class="col-md-5 text-md-end">
               <span class="text-muted" id="studentCountLabel">Showing 0 students</span>
@@ -100,14 +100,15 @@
                 <tr>
                   <th>Name</th>
                   <th>Roll No</th>
-                  <th>Class</th>
+                  <th>Course</th>
+                  <th>Semester</th>
                   <th>Email</th>
                   <th class="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody id="studentsTable">
                 <tr>
-                  <td colspan="5" class="text-center py-5 text-muted">Loading students...</td>
+                  <td colspan="6" class="text-center py-5 text-muted">Loading students...</td>
                 </tr>
               </tbody>
             </table>
@@ -135,8 +136,22 @@
               <input type="text" class="form-control" id="rollNumber" placeholder="Enter roll number" required>
             </div>
             <div class="mb-3">
-              <label for="studentClass" class="form-label">Class</label>
-              <input type="text" class="form-control" id="studentClass" placeholder="Enter class" required>
+              <label for="studentCourse" class="form-label">Course</label>
+              <select class="form-control" id="studentCourse" required onchange="updateSemesterOptions()">
+                <option value="">Select a course</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="studentSemester" class="form-label">Semester</label>
+              <select class="form-control" id="studentSemester" required onchange="updatePaperOptions()" disabled>
+                <option value="">Select a semester</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="studentPapers" class="form-label">Papers (Select 1-4)</label>
+              <div id="studentPapers" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                <p class="text-muted small">Please select a course and semester first</p>
+              </div>
             </div>
             <div class="mb-0">
               <label for="studentEmail" class="form-label">Email</label>
@@ -157,6 +172,9 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let students = []
+    let courses = []
+    let activeSemestersOptions = []
+    let activePapersOptions = []
     let activeStudentId = null
     let studentModal
 
@@ -191,27 +209,31 @@
       if (list.length === 0) {
         const searchQuery = document.getElementById("searchInput").value.trim()
         tableBody.innerHTML = searchQuery
-          ? '<tr><td colspan="5" class="text-center py-5 text-muted">No students match your search.</td></tr>'
-          : '<tr><td colspan="5" class="text-center py-5 text-muted">No students added yet. Click Add Student to begin.</td></tr>'
+          ? '<tr><td colspan="6" class="text-center py-5 text-muted">No students match your search.</td></tr>'
+          : '<tr><td colspan="6" class="text-center py-5 text-muted">No students added yet. Click Add Student to begin.</td></tr>'
         return
       }
 
-      tableBody.innerHTML = list.map(student => `
-        <tr>
-          <td>${window.escapeHtml(student.name)}</td>
-          <td>${window.escapeHtml(student.roll)}</td>
-          <td>${window.escapeHtml(student.class)}</td>
-          <td>${window.escapeHtml(student.email)}</td>
-          <td class="text-center">
-            <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent(${Number(student.id)})" aria-label="Edit ${window.escapeHtml(student.name)}">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${Number(student.id)})" aria-label="Delete ${window.escapeHtml(student.name)}">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
-        </tr>
-      `).join("")
+      tableBody.innerHTML = list.map(student => {
+        const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
+        return `
+          <tr>
+            <td>${window.escapeHtml(student.name)}</td>
+            <td>${window.escapeHtml(student.roll)}</td>
+            <td>${window.escapeHtml(courseName)}</td>
+            <td>${student.semester}</td>
+            <td>${window.escapeHtml(student.email)}</td>
+            <td class="text-center">
+              <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent(${Number(student.id)})" aria-label="Edit ${window.escapeHtml(student.name)}">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${Number(student.id)})" aria-label="Delete ${window.escapeHtml(student.name)}">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `
+      }).join("")
     }
 
     function applySearch() {
@@ -221,26 +243,115 @@
         return
       }
 
-      const filtered = students.filter(student =>
-        student.name.toLowerCase().includes(query) ||
-        student.roll.toLowerCase().includes(query) ||
-        student.class.toLowerCase().includes(query) ||
-        student.email.toLowerCase().includes(query)
-      )
+      const filtered = students.filter(student => {
+        const courseName = courses.find(c => c.id === student.course_id)?.name || ""
+        return (
+          student.name.toLowerCase().includes(query) ||
+          student.roll.toLowerCase().includes(query) ||
+          courseName.toLowerCase().includes(query) ||
+          student.email.toLowerCase().includes(query)
+        )
+      })
 
       renderStudents(filtered)
     }
 
+    window.updateSemesterOptions = async function() {
+      const courseId = document.getElementById("studentCourse").value
+      const semesterSelect = document.getElementById("studentSemester")
+      const papersContainer = document.getElementById("studentPapers")
+      
+      semesterSelect.disabled = true
+      semesterSelect.innerHTML = '<option value="">Select a semester</option>'
+      papersContainer.innerHTML = '<p class="text-muted small">Please select a course and semester first</p>'
+      
+      if (!courseId) {
+        return
+      }
+
+      try {
+        activeSemestersOptions = await window.apiRequest(`/courses/${courseId}/semesters`)
+        semesterSelect.disabled = false
+        
+        activeSemestersOptions.forEach(semester => {
+          const option = document.createElement("option")
+          option.value = semester
+          option.textContent = `Semester ${semester}`
+          semesterSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load semesters for this course.")
+      }
+    }
+
+    window.updatePaperOptions = async function() {
+      const courseId = document.getElementById("studentCourse").value
+      const semester = document.getElementById("studentSemester").value
+      const papersContainer = document.getElementById("studentPapers")
+      
+      papersContainer.innerHTML = '<p class="text-muted small">Loading papers...</p>'
+      
+      if (!courseId || !semester) {
+        papersContainer.innerHTML = '<p class="text-muted small">Please select a course and semester first</p>'
+        return
+      }
+
+      try {
+        activePapersOptions = await window.apiRequest(`/courses/${courseId}/semesters/${semester}/papers`)
+        
+        if (activePapersOptions.length === 0) {
+          papersContainer.innerHTML = '<p class="text-muted small">No papers available for this course and semester.</p>'
+          return
+        }
+
+        papersContainer.innerHTML = activePapersOptions.map(paper => `
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" value="${paper.id}" id="paper_${paper.id}" onchange="updatePaperCount()">
+            <label class="form-check-label" for="paper_${paper.id}">
+              ${window.escapeHtml(paper.name)}
+              ${paper.code ? `<span class="text-muted small">(${paper.code})</span>` : ""}
+            </label>
+          </div>
+        `).join("")
+      } catch (error) {
+        papersContainer.innerHTML = '<p class="text-danger small">Unable to load papers for this course and semester.</p>'
+      }
+    }
+
+    window.updatePaperCount = function() {
+      const checkboxes = document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
+      const count = checkboxes.length
+      const papersLabel = document.querySelector('label[for="studentPapers"]')
+      papersLabel.textContent = `Papers (Select 1-4) - Selected: ${count}`
+    }
+
     async function loadStudents() {
       setAlert("")
-      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Loading students...</td></tr>'
+      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Loading students...</td></tr>'
 
       try {
         students = await window.apiRequest("/students")
         applySearch()
       } catch (error) {
-        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Unable to load students right now.</td></tr>'
+        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Unable to load students right now.</td></tr>'
         setAlert(error.message || "Unable to load students right now.")
+      }
+    }
+
+    async function loadCourses() {
+      try {
+        courses = await window.apiRequest("/courses")
+        const courseSelect = document.getElementById("studentCourse")
+        courseSelect.innerHTML = '<option value="">Select a course</option>'
+        
+        courses.forEach(course => {
+          const option = document.createElement("option")
+          option.value = course.id
+          option.textContent = course.name
+          courseSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load courses.")
       }
     }
 
@@ -248,6 +359,10 @@
       activeStudentId = null
       document.getElementById("studentForm").reset()
       document.getElementById("modalTitle").textContent = "Add Student"
+      document.getElementById("studentSemester").disabled = true
+      document.getElementById("studentSemester").innerHTML = '<option value="">Select a semester</option>'
+      document.getElementById("studentPapers").innerHTML = '<p class="text-muted small">Please select a course and semester first</p>'
+      document.querySelector('label[for="studentPapers"]').textContent = 'Papers (Select 1-4)'
       setSaveButtonState(false)
     }
 
@@ -267,20 +382,46 @@
       document.getElementById("modalTitle").textContent = "Edit Student"
       document.getElementById("studentName").value = student.name
       document.getElementById("rollNumber").value = student.roll
-      document.getElementById("studentClass").value = student.class
+      document.getElementById("studentCourse").value = student.course_id
       document.getElementById("studentEmail").value = student.email
       setSaveButtonState(false)
+      
+      // Load semester options for this course
+      updateSemesterOptions().then(() => {
+        document.getElementById("studentSemester").value = student.semester
+        // Load paper options for this course/semester, then select the student's papers
+        updatePaperOptions().then(() => {
+          const papers = Array.isArray(student.papers) ? student.papers : JSON.parse(student.papers || "[]")
+          papers.forEach(paperId => {
+            const checkbox = document.getElementById(`paper_${paperId}`)
+            if (checkbox) checkbox.checked = true
+          })
+          updatePaperCount()
+        })
+      })
+      
       studentModal.show()
     }
 
     window.saveStudent = async function() {
       const name = document.getElementById("studentName").value.trim()
       const roll = document.getElementById("rollNumber").value.trim()
-      const studentClass = document.getElementById("studentClass").value.trim()
+      const courseId = document.getElementById("studentCourse").value.trim()
+      const semester = document.getElementById("studentSemester").value.trim()
       const email = document.getElementById("studentEmail").value.trim().toLowerCase()
+      
+      // Get selected papers
+      const selectedPapers = Array.from(
+        document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
+      ).map(checkbox => Number(checkbox.value))
 
-      if (!name || !roll || !studentClass || !email) {
+      if (!name || !roll || !courseId || !semester || !email) {
         setAlert("Please fill in all student fields.")
+        return
+      }
+
+      if (selectedPapers.length < 1 || selectedPapers.length > 4) {
+        setAlert("You must select between 1 and 4 papers.")
         return
       }
 
@@ -288,7 +429,14 @@
       setSaveButtonState(true)
 
       try {
-        const payload = { name, roll, class: studentClass, email }
+        const payload = {
+          name,
+          roll,
+          course_id: Number(courseId),
+          semester: Number(semester),
+          papers: selectedPapers,
+          email,
+        }
         const path = activeStudentId ? `/students/${activeStudentId}` : "/students"
         const method = activeStudentId ? "PUT" : "POST"
         const result = await window.apiRequest(path, { method, body: payload })
@@ -334,6 +482,7 @@
         event.preventDefault()
         window.saveStudent()
       })
+      loadCourses()
       loadStudents()
     })
   </script>

@@ -19,6 +19,7 @@ Version: 1.0
 from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
+import json
 import os
 import re
 import secrets
@@ -265,19 +266,35 @@ def validate_student_payload(data):
     # Validate student creation/update payload
     name = normalize_text(data.get("name"))
     roll = normalize_text(data.get("roll"))
-    student_class = normalize_text(data.get("class"))
+    course_id = data.get("course_id")
+    semester = data.get("semester")
+    papers = data.get("papers", [])
     email = normalize_email(data.get("email"))
 
-    if not all([name, roll, student_class, email]):
-        return None, "All student fields are required."
+    if not all([name, roll, course_id, semester, email]):
+        return None, "All student fields (name, roll, course, semester, email) are required."
 
     if not is_valid_email(email):
         return None, "Please enter a valid student email address."
 
+    try:
+        course_id = int(course_id)
+        semester = int(semester)
+    except (TypeError, ValueError):
+        return None, "Course ID and semester must be valid numbers."
+
+    if semester < 1 or semester > 8:
+        return None, "Semester must be between 1 and 8."
+
+    if not isinstance(papers, list) or len(papers) < 1 or len(papers) > 4:
+        return None, "You must select between 1 and 4 papers."
+
     return {
         "name": name,
         "roll": roll,
-        "class": student_class,
+        "course_id": course_id,
+        "semester": semester,
+        "papers": papers,
         "email": email,
     }, None
 
@@ -482,6 +499,31 @@ def add_student():
     try:
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
+        
+        # Verify course exists
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (student["course_id"],))
+        if not cursor.fetchone():
+            return json_error("Selected course does not exist.", 404)
+        
+        # Verify semester exists for this course
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (student["course_id"], student["semester"]),
+        )
+        if not cursor.fetchone():
+            return json_error("Selected semester is not available for this course.", 404)
+        
+        # Verify all papers exist for this course/semester
+        if student["papers"]:
+            placeholders = ", ".join(["%s"] * len(student["papers"]))
+            cursor.execute(
+                f"SELECT id FROM papers WHERE course_id = %s AND semester = %s AND id IN ({placeholders})",
+                (student["course_id"], student["semester"], *student["papers"]),
+            )
+            valid_papers = {row["id"] for row in cursor.fetchall()}
+            if len(valid_papers) != len(student["papers"]):
+                return json_error("One or more selected papers do not exist for this course/semester.", 404)
+        
         cursor.execute(
             "SELECT id FROM students WHERE roll = %s OR email = %s",
             (student["roll"], student["email"]),
@@ -490,8 +532,15 @@ def add_student():
             return json_error("Roll number or email already exists.", 409)
 
         cursor.execute(
-            "INSERT INTO students (name, roll, `class`, email) VALUES (%s, %s, %s, %s)",
-            (student["name"], student["roll"], student["class"], student["email"]),
+            "INSERT INTO students (name, roll, course_id, semester, papers, email) VALUES (%s, %s, %s, %s, %s, %s)",
+            (
+                student["name"],
+                student["roll"],
+                student["course_id"],
+                student["semester"],
+                json.dumps(student["papers"]),
+                student["email"],
+            ),
         )
         conn.commit()
 
@@ -529,6 +578,30 @@ def update_student(student_id):
         if not cursor.fetchone():
             return json_error("Student not found.", 404)
 
+        # Verify course exists
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (student["course_id"],))
+        if not cursor.fetchone():
+            return json_error("Selected course does not exist.", 404)
+        
+        # Verify semester exists for this course
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (student["course_id"], student["semester"]),
+        )
+        if not cursor.fetchone():
+            return json_error("Selected semester is not available for this course.", 404)
+        
+        # Verify all papers exist for this course/semester
+        if student["papers"]:
+            placeholders = ", ".join(["%s"] * len(student["papers"]))
+            cursor.execute(
+                f"SELECT id FROM papers WHERE course_id = %s AND semester = %s AND id IN ({placeholders})",
+                (student["course_id"], student["semester"], *student["papers"]),
+            )
+            valid_papers = {row["id"] for row in cursor.fetchall()}
+            if len(valid_papers) != len(student["papers"]):
+                return json_error("One or more selected papers do not exist for this course/semester.", 404)
+
         # Ensure new roll/email don't conflict with other students
         cursor.execute(
             "SELECT id FROM students WHERE (roll = %s OR email = %s) AND id <> %s",
@@ -539,11 +612,13 @@ def update_student(student_id):
 
         # Update student record with new values
         cursor.execute(
-            "UPDATE students SET name = %s, roll = %s, `class` = %s, email = %s WHERE id = %s",
+            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s WHERE id = %s",
             (
                 student["name"],
                 student["roll"],
-                student["class"],
+                student["course_id"],
+                student["semester"],
+                json.dumps(student["papers"]),
                 student["email"],
                 student_id,
             ),
@@ -583,6 +658,86 @@ def delete_student(student_id):
         return jsonify({"message": "Student deleted successfully."})
     except mysql.connector.Error:
         return json_error("Unable to delete the student right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
+
+
+# ========== COURSES ENDPOINTS ==========
+@app.route("/courses", methods=["GET"])
+@require_auth
+def get_courses():
+    # Get all available courses - GET /courses
+    conn = cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, name, code FROM courses ORDER BY name ASC")
+        data = [serialize_row(row) for row in cursor.fetchall()]
+        return jsonify(data)
+    except mysql.connector.Error:
+        return json_error("Unable to load courses right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
+
+
+# ========== COURSE SEMESTERS ENDPOINTS ==========
+@app.route("/courses/<int:course_id>/semesters", methods=["GET"])
+@require_auth
+def get_semesters(course_id):
+    # Get semesters for a specific course - GET /courses/{course_id}/semesters
+    conn = cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Verify course exists
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (course_id,))
+        if not cursor.fetchone():
+            return json_error("Course not found.", 404)
+        
+        cursor.execute(
+            "SELECT semester FROM course_semesters WHERE course_id = %s ORDER BY semester ASC",
+            (course_id,),
+        )
+        data = [row["semester"] for row in cursor.fetchall()]
+        return jsonify(data)
+    except mysql.connector.Error:
+        return json_error("Unable to load semesters right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
+
+
+# ========== PAPERS ENDPOINTS ==========
+@app.route("/courses/<int:course_id>/semesters/<int:semester>/papers", methods=["GET"])
+@require_auth
+def get_papers(course_id, semester):
+    # Get papers for a specific course and semester - GET /courses/{course_id}/semesters/{semester}/papers
+    conn = cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Verify course exists
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (course_id,))
+        if not cursor.fetchone():
+            return json_error("Course not found.", 404)
+        
+        # Verify semester exists for this course
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (course_id, semester),
+        )
+        if not cursor.fetchone():
+            return json_error("Semester not found for this course.", 404)
+        
+        cursor.execute(
+            "SELECT id, name, code FROM papers WHERE course_id = %s AND semester = %s ORDER BY name ASC",
+            (course_id, semester),
+        )
+        data = [serialize_row(row) for row in cursor.fetchall()]
+        return jsonify(data)
+    except mysql.connector.Error:
+        return json_error("Unable to load papers right now.", 500)
     finally:
         close_db(conn, cursor, rollback=False)
 
