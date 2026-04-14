@@ -117,6 +117,28 @@ def initialize_database():
         """)
         print("✅ Created 'students' table")
         
+        # Check and add missing columns to students table
+        columns_to_check = {
+            'course_id': 'ALTER TABLE students ADD COLUMN course_id INT NOT NULL DEFAULT 1, ADD FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT',
+            'semester': 'ALTER TABLE students ADD COLUMN semester INT NOT NULL DEFAULT 1',
+            'papers': 'ALTER TABLE students ADD COLUMN papers JSON',
+            'phone': 'ALTER TABLE students ADD COLUMN phone VARCHAR(20)'
+        }
+        
+        for col_name, alter_query in columns_to_check.items():
+            cursor.execute("""
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'students' AND COLUMN_NAME = %s
+            """, (col_name,))
+            if not cursor.fetchone():
+                try:
+                    cursor.execute(alter_query)
+                    print(f"✅ Added '{col_name}' column to students table")
+                except Exception as e:
+                    print(f"⚠️  Could not add '{col_name}' column: {str(e)}")
+            else:
+                print(f"ℹ️  '{col_name}' column already exists in students table")
+        
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
           id INT AUTO_INCREMENT PRIMARY KEY,
