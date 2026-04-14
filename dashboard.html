@@ -148,7 +148,8 @@
                     <tr>
                       <th>Student Name</th>
                       <th>Roll Number</th>
-                      <th>Class</th>
+                      <th>Course</th>
+                      <th>Semester</th>
                       <th>Subject</th>
                       <th>Date</th>
                       <th>Status</th>
@@ -156,7 +157,7 @@
                   </thead>
                   <tbody id="recentAttendanceTable">
                     <tr>
-                      <td colspan="6" class="text-center py-4">Loading dashboard data...</td>
+                      <td colspan="7" class="text-center py-4">Loading dashboard data...</td>
                     </tr>
                   </tbody>
                 </table>
@@ -225,23 +226,25 @@
       return '<span class="badge bg-danger">Absent</span>'
     }
 
-    function renderRecentAttendance(attendance, studentsById) {
+    function renderRecentAttendance(attendance, studentsById, coursesById) {
       const tableBody = document.getElementById("recentAttendanceTable")
       const recentRecords = attendance.slice(0, 10)
       document.getElementById("recentCount").textContent = `${recentRecords.length} records`
 
       if (recentRecords.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No attendance records found yet.</td></tr>'
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No attendance records found yet.</td></tr>'
         return
       }
 
       tableBody.innerHTML = recentRecords.map(record => {
         const student = studentsById.get(record.student_id) || {}
+        const courseName = coursesById.get(student.course_id)?.name || "Unknown"
         return `
           <tr>
             <td>${window.escapeHtml(student.name || "Unknown Student")}</td>
             <td>${window.escapeHtml(student.roll || "-")}</td>
-            <td>${window.escapeHtml(student.class || "-")}</td>
+            <td>${window.escapeHtml(courseName)}</td>
+            <td>${student.semester || "-"}</td>
             <td>${window.escapeHtml(record.subject || "-")}</td>
             <td>${window.escapeHtml(window.formatDate(record.date))}</td>
             <td>${buildStatusBadge(record.status)}</td>
@@ -255,13 +258,15 @@
       document.getElementById("todayLabel").textContent = window.formatDate(window.getTodayLocalDate())
 
       try {
-        const [students, attendance] = await Promise.all([
+        const [students, attendance, courses] = await Promise.all([
           window.apiRequest("/students"),
-          window.apiRequest("/attendance")
+          window.apiRequest("/attendance"),
+          window.apiRequest("/courses")
         ])
 
         const totalStudents = students.length
         const studentsById = new Map(students.map(student => [Number(student.id), student]))
+        const coursesById = new Map(courses.map(course => [course.id, course]))
         const today = window.getTodayLocalDate()
         const todayRecords = attendance.filter(record => record.date === today)
         const presentStudentIds = new Set(
@@ -286,9 +291,9 @@
           ? `Tracked across ${subjectsToday.length} subject${subjectsToday.length === 1 ? "" : "s"} today`
           : "No attendance submitted for today yet"
 
-        renderRecentAttendance(attendance, studentsById)
+        renderRecentAttendance(attendance, studentsById, coursesById)
       } catch (error) {
-        document.getElementById("recentAttendanceTable").innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Unable to load dashboard right now.</td></tr>'
+        document.getElementById("recentAttendanceTable").innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">Unable to load dashboard right now.</td></tr>'
         setAlert(error.message || "Unable to load dashboard data right now.")
       }
     }
