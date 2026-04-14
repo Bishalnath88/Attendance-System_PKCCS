@@ -48,6 +48,9 @@ logs/
 
 # OS
 Thumbs.db
+
+# Utility Scripts (development only)
+check_students.py
 .DS_Store
 
 # Testing
