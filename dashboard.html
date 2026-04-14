@@ -150,7 +150,7 @@
                       <th>Roll Number</th>
                       <th>Course</th>
                       <th>Semester</th>
-                      <th>Subject</th>
+                      <th>Paper</th>
                       <th>Date</th>
                       <th>Status</th>
                     </tr>
@@ -286,9 +286,9 @@
         document.getElementById("absentToday").textContent = absentCount
         document.getElementById("attendanceRate").textContent = `${attendanceRate}%`
 
-        const subjectsToday = [...new Set(todayRecords.map(record => record.subject).filter(Boolean))]
-        document.getElementById("presentFooter").textContent = subjectsToday.length > 0
-          ? `Tracked across ${subjectsToday.length} subject${subjectsToday.length === 1 ? "" : "s"} today`
+        const papersToday = [...new Set(todayRecords.map(record => record.subject).filter(Boolean))]
+        document.getElementById("presentFooter").textContent = papersToday.length > 0
+          ? `Tracked across ${papersToday.length} paper${papersToday.length === 1 ? "" : "s"} today`
           : "No attendance submitted for today yet"
 
         renderRecentAttendance(attendance, studentsById, coursesById)
