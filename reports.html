@@ -81,20 +81,35 @@
         </div>
         <div class="card-body">
           <div class="row gy-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
+              <label for="repCourse" class="form-label">Course</label>
+              <select class="form-select" id="repCourse" onchange="updateRepSemesterOptions()">
+                <option value="">All Courses</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="repSemester" class="form-label">Semester</label>
+              <select class="form-select" id="repSemester" onchange="updateRepPaperOptions()" disabled>
+                <option value="">All Semesters</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="repPaper" class="form-label">Paper</label>
+              <select class="form-select" id="repPaper" disabled>
+                <option value="">All Papers</option>
+              </select>
+            </div>
+            <div class="col-md-3">
               <label for="startDate" class="form-label">Start Date</label>
               <input type="date" class="form-control" id="startDate">
             </div>
-            <div class="col-md-4">
+          </div>
+          <div class="row gy-3 mt-2">
+            <div class="col-md-3">
               <label for="endDate" class="form-label">End Date</label>
               <input type="date" class="form-control" id="endDate">
             </div>
-            <div class="col-md-4">
-              <label for="reportSubject" class="form-label">Subject</label>
-              <select class="form-select" id="reportSubject">
-                <option value="">All Subjects</option>
-              </select>
-            </div>
+            <div class="col-md-9"></div>
           </div>
           <div class="row mt-3 g-3">
             <div class="col-12 col-sm-6">
@@ -136,7 +151,8 @@
                 <tr>
                   <th>Roll Number</th>
                   <th>Name</th>
-                  <th>Class</th>
+                  <th>Course</th>
+                  <th>Semester</th>
                   <th>Total Days</th>
                   <th>Present</th>
                   <th>Absent</th>
@@ -146,7 +162,7 @@
               </thead>
               <tbody id="reportTableBody">
                 <tr>
-                  <td colspan="8" class="text-center py-4">Select date range and click Generate Report.</td>
+                  <td colspan="9" class="text-center py-4">Select filters and click Generate Report.</td>
                 </tr>
               </tbody>
             </table>
@@ -188,9 +204,14 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let students = []
+    let courses = []
+    let allPapers = []
     let allAttendanceRecords = []
     let reportData = []
     let attendanceChart = null
+    let selectedCourseId = null
+    let selectedSemester = null
+    let selectedPaperId = null
 
     function setAlert(message = "", type = "danger") {
       const alertBox = document.getElementById("reportAlert")
@@ -228,22 +249,70 @@
       return totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 0
     }
 
-    function loadSubjects() {
-      const reportSubject = document.getElementById("reportSubject")
-      const subjects = [...new Set(allAttendanceRecords.map(record => record.subject).filter(Boolean))].sort()
-      const fallbackSubjects = ["Mathematics", "English", "Science", "History", "Computer Science"]
-      const options = (subjects.length ? subjects : fallbackSubjects).map(subject => `
-        <option value="${window.escapeHtml(subject)}">${window.escapeHtml(subject)}</option>
-      `).join("")
+    window.updateRepSemesterOptions = async function() {
+      const courseSelect = document.getElementById("repCourse")
+      const semesterSelect = document.getElementById("repSemester")
+      const paperSelect = document.getElementById("repPaper")
+      
+      selectedCourseId = courseSelect.value ? Number(courseSelect.value) : null
+      selectedSemester = null
+      selectedPaperId = null
+      
+      semesterSelect.disabled = !selectedCourseId
+      semesterSelect.innerHTML = '<option value="">All Semesters</option>'
+      paperSelect.disabled = true
+      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      
+      if (!selectedCourseId) {
+        return
+      }
 
-      reportSubject.innerHTML = `<option value="">All Subjects</option>${options}`
+      try {
+        const semesters = await window.apiRequest(`/courses/${selectedCourseId}/semesters`)
+        semesters.forEach(semester => {
+          const option = document.createElement("option")
+          option.value = semester
+          option.textContent = `Semester ${semester}`
+          semesterSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load semesters for this course.")
+      }
+    }
+
+    window.updateRepPaperOptions = async function() {
+      const semesterSelect = document.getElementById("repSemester")
+      const paperSelect = document.getElementById("repPaper")
+      
+      selectedSemester = semesterSelect.value ? Number(semesterSelect.value) : null
+      selectedPaperId = null
+      
+      paperSelect.disabled = !selectedCourseId || !selectedSemester
+      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      
+      if (!selectedCourseId || !selectedSemester) {
+        return
+      }
+
+      try {
+        allPapers = await window.apiRequest(`/courses/${selectedCourseId}/semesters/${selectedSemester}/papers`)
+        allPapers.forEach(paper => {
+          const option = document.createElement("option")
+          option.value = paper.id
+          option.textContent = paper.name + (paper.code ? ` (${paper.code})` : "")
+          paperSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load papers for this course/semester.")
+        allPapers = []
+      }
     }
 
     function displayReport() {
       const tableBody = document.getElementById("reportTableBody")
 
       if (reportData.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No data found for the selected filters.</td></tr>'
+        tableBody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No data found for the selected filters.</td></tr>'
         return
       }
 
@@ -253,7 +322,8 @@
           <tr>
             <td>${window.escapeHtml(student.rollNumber)}</td>
             <td>${window.escapeHtml(student.name)}</td>
-            <td>${window.escapeHtml(student.className)}</td>
+            <td>${window.escapeHtml(student.courseName)}</td>
+            <td>${student.semester}</td>
             <td>${student.totalDays}</td>
             <td><span class="badge bg-success">${student.present}</span></td>
             <td><span class="badge bg-danger">${student.absent}</span></td>
@@ -331,7 +401,7 @@
           <div>
             <strong>${index + 1}. ${window.escapeHtml(student.name)}</strong>
             <br>
-            <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.className)}</small>
+            <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.courseName)} Sem ${student.semester}</small>
           </div>
           <span class="badge bg-success">${student.percentage}%</span>
         </div>
@@ -343,7 +413,7 @@
             <div>
               <strong>${window.escapeHtml(student.name)}</strong>
               <br>
-              <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.className)}</small>
+              <small class="text-muted">${window.escapeHtml(student.rollNumber)} - ${window.escapeHtml(student.courseName)} Sem ${student.semester}</small>
             </div>
             <span class="badge bg-danger">${student.percentage}%</span>
           </div>
@@ -353,13 +423,23 @@
 
     async function loadInitialData() {
       try {
-        const [studentData, attendanceData] = await Promise.all([
+        const [courseData, studentData, attendanceData] = await Promise.all([
+          window.apiRequest("/courses"),
           window.apiRequest("/students"),
           window.apiRequest("/attendance")
         ])
+        courses = courseData
         students = studentData
         allAttendanceRecords = attendanceData
-        loadSubjects()
+        
+        // Populate courses dropdown
+        const courseSelect = document.getElementById("repCourse")
+        courses.forEach(course => {
+          const option = document.createElement("option")
+          option.value = course.id
+          option.textContent = course.name
+          courseSelect.appendChild(option)
+        })
       } catch (error) {
         setAlert(error.message || "Unable to load report data right now.")
       }
@@ -367,9 +447,16 @@
 
     window.resetFilters = function() {
       const range = getDefaultDateRange()
+      document.getElementById("repCourse").selectedIndex = 0
+      document.getElementById("repSemester").selectedIndex = 0
+      document.getElementById("repPaper").selectedIndex = 0
       document.getElementById("startDate").value = range.start
       document.getElementById("endDate").value = range.end
-      document.getElementById("reportSubject").selectedIndex = 0
+      document.getElementById("repSemester").disabled = true
+      document.getElementById("repPaper").disabled = true
+      selectedCourseId = null
+      selectedSemester = null
+      selectedPaperId = null
       reportData = []
       displayReport()
       updateChart([], [])
@@ -382,7 +469,6 @@
 
       const startDate = document.getElementById("startDate").value
       const endDate = document.getElementById("endDate").value
-      const subject = document.getElementById("reportSubject").value
 
       if (!startDate || !endDate) {
         setAlert("Please select both a start date and an end date.")
@@ -405,13 +491,41 @@
         const filteredAttendance = await window.apiRequest("/attendance", {
           query: {
             start_date: startDate,
-            end_date: endDate,
-            subject
+            end_date: endDate
           }
         })
 
-        reportData = students.map(student => {
-          const studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(student.id))
+        let filteredStudents = students
+        
+        // Filter by course if selected
+        if (selectedCourseId) {
+          filteredStudents = filteredStudents.filter(s => s.course_id === selectedCourseId)
+        }
+        
+        // Filter by semester if selected
+        if (selectedSemester) {
+          filteredStudents = filteredStudents.filter(s => s.semester === selectedSemester)
+        }
+        
+        // Filter by paper if selected
+        if (selectedPaperId) {
+          filteredStudents = filteredStudents.filter(s => {
+            const papers = Array.isArray(s.papers) ? s.papers : JSON.parse(s.papers || "[]")
+            return papers.includes(selectedPaperId)
+          })
+        }
+
+        reportData = filteredStudents.map(student => {
+          const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
+          let studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(student.id))
+          
+          // Filter attendance by paper if selected
+          if (selectedPaperId) {
+            const selectedPaper = allPapers.find(p => p.id === selectedPaperId)
+            const paperName = selectedPaper ? selectedPaper.name : ""
+            studentAttendance = studentAttendance.filter(record => record.subject === paperName)
+          }
+          
           const totalDays = studentAttendance.length
           const present = studentAttendance.filter(record => record.status === "present").length
           const absent = studentAttendance.filter(record => record.status === "absent").length
@@ -421,7 +535,8 @@
           return {
             rollNumber: student.roll || "-",
             name: student.name,
-            className: student.class || "-",
+            courseName,
+            semester: student.semester,
             totalDays,
             present,
             absent,
@@ -437,8 +552,8 @@
         )
         displayTopAndLowStudents()
 
-        if (filteredAttendance.length === 0) {
-          setAlert("No attendance records were found for the selected filters.", "info")
+        if (reportData.length === 0) {
+          setAlert("No students found for the selected filters.", "info")
         }
       } catch (error) {
         setAlert(error.message || "Unable to generate the report right now.")
@@ -454,11 +569,12 @@
       }
 
       const csvRows = [
-        ["Roll Number", "Name", "Class", "Total Days", "Present", "Absent", "Late", "Attendance %"],
+        ["Roll Number", "Name", "Course", "Semester", "Total Days", "Present", "Absent", "Late", "Attendance %"],
         ...reportData.map(student => [
           student.rollNumber,
           student.name,
-          student.className,
+          student.courseName,
+          student.semester,
           student.totalDays,
           student.present,
           student.absent,
