@@ -105,6 +105,7 @@ def initialize_database():
           semester INT NOT NULL,
           papers JSON,
           email VARCHAR(255) NOT NULL UNIQUE,
+          phone VARCHAR(20),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT,

@@ -270,12 +270,17 @@ def validate_student_payload(data):
     semester = data.get("semester")
     papers = data.get("papers", [])
     email = normalize_email(data.get("email"))
+    phone = normalize_text(data.get("phone", ""))
 
-    if not all([name, roll, course_id, semester, email]):
-        return None, "All student fields (name, roll, course, semester, email) are required."
+    if not all([name, roll, course_id, semester, email, phone]):
+        return None, "All student fields (name, roll, course, semester, email, phone) are required."
 
     if not is_valid_email(email):
         return None, "Please enter a valid student email address."
+
+    # Validate phone number format (10-15 digits allowed, with optional country code)
+    if not re.match(r"^[\d\s+\-()]{10,15}$", phone):
+        return None, "Please enter a valid phone number (10-15 digits)."
 
     try:
         course_id = int(course_id)
@@ -296,6 +301,7 @@ def validate_student_payload(data):
         "semester": semester,
         "papers": papers,
         "email": email,
+        "phone": phone,
     }, None
 
 
@@ -532,7 +538,7 @@ def add_student():
             return json_error("Roll number or email already exists.", 409)
 
         cursor.execute(
-            "INSERT INTO students (name, roll, course_id, semester, papers, email) VALUES (%s, %s, %s, %s, %s, %s)",
+            "INSERT INTO students (name, roll, course_id, semester, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (
                 student["name"],
                 student["roll"],
@@ -540,6 +546,7 @@ def add_student():
                 student["semester"],
                 json.dumps(student["papers"]),
                 student["email"],
+                student["phone"],
             ),
         )
         conn.commit()
@@ -612,7 +619,7 @@ def update_student(student_id):
 
         # Update student record with new values
         cursor.execute(
-            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s WHERE id = %s",
+            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
             (
                 student["name"],
                 student["roll"],
@@ -620,6 +627,7 @@ def update_student(student_id):
                 student["semester"],
                 json.dumps(student["papers"]),
                 student["email"],
+                student["phone"],
                 student_id,
             ),
         )

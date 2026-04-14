@@ -103,6 +103,7 @@
                   <th>Course</th>
                   <th>Semester</th>
                   <th>Email</th>
+                  <th>Phone</th>
                   <th class="text-center">Actions</th>
                 </tr>
               </thead>
@@ -153,9 +154,13 @@
                 <p class="text-muted small">Please select a course and semester first</p>
               </div>
             </div>
-            <div class="mb-0">
+            <div class="mb-3">
               <label for="studentEmail" class="form-label">Email</label>
               <input type="email" class="form-control" id="studentEmail" placeholder="Enter email address" required>
+            </div>
+            <div class="mb-0">
+              <label for="studentPhone" class="form-label">Phone Number</label>
+              <input type="tel" class="form-control" id="studentPhone" placeholder="Enter phone number (10-15 digits)" required>
             </div>
           </form>
         </div>
@@ -209,8 +214,8 @@
       if (list.length === 0) {
         const searchQuery = document.getElementById("searchInput").value.trim()
         tableBody.innerHTML = searchQuery
-          ? '<tr><td colspan="6" class="text-center py-5 text-muted">No students match your search.</td></tr>'
-          : '<tr><td colspan="6" class="text-center py-5 text-muted">No students added yet. Click Add Student to begin.</td></tr>'
+          ? '<tr><td colspan="7" class="text-center py-5 text-muted">No students match your search.</td></tr>'
+          : '<tr><td colspan="7" class="text-center py-5 text-muted">No students added yet. Click Add Student to begin.</td></tr>'
         return
       }
 
@@ -223,6 +228,7 @@
             <td>${window.escapeHtml(courseName)}</td>
             <td>${student.semester}</td>
             <td>${window.escapeHtml(student.email)}</td>
+            <td>${window.escapeHtml(student.phone || "-")}</td>
             <td class="text-center">
               <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent(${Number(student.id)})" aria-label="Edit ${window.escapeHtml(student.name)}">
                 <i class="fas fa-edit"></i>
@@ -249,7 +255,8 @@
           student.name.toLowerCase().includes(query) ||
           student.roll.toLowerCase().includes(query) ||
           courseName.toLowerCase().includes(query) ||
-          student.email.toLowerCase().includes(query)
+          student.email.toLowerCase().includes(query) ||
+          (student.phone && student.phone.toLowerCase().includes(query))
         )
       })
 
@@ -384,6 +391,7 @@
       document.getElementById("rollNumber").value = student.roll
       document.getElementById("studentCourse").value = student.course_id
       document.getElementById("studentEmail").value = student.email
+      document.getElementById("studentPhone").value = student.phone || ""
       setSaveButtonState(false)
       
       // Load semester options for this course
@@ -409,13 +417,14 @@
       const courseId = document.getElementById("studentCourse").value.trim()
       const semester = document.getElementById("studentSemester").value.trim()
       const email = document.getElementById("studentEmail").value.trim().toLowerCase()
+      const phone = document.getElementById("studentPhone").value.trim()
       
       // Get selected papers
       const selectedPapers = Array.from(
         document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
       ).map(checkbox => Number(checkbox.value))
 
-      if (!name || !roll || !courseId || !semester || !email) {
+      if (!name || !roll || !courseId || !semester || !email || !phone) {
         setAlert("Please fill in all student fields.")
         return
       }
@@ -436,6 +445,7 @@
           semester: Number(semester),
           papers: selectedPapers,
           email,
+          phone,
         }
         const path = activeStudentId ? `/students/${activeStudentId}` : "/students"
         const method = activeStudentId ? "PUT" : "POST"
