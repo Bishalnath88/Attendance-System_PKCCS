@@ -79,7 +79,7 @@
         <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
           <div>
             <h5>Attendance Setup</h5>
-            <p class="mb-0 text-muted">Changing the date or subject reloads any saved attendance for that session.</p>
+            <p class="mb-0 text-muted">Select course, semester, and paper to load students for attendance.</p>
           </div>
           <button class="btn btn-outline-secondary" onclick="resetAttendance()">
             <i class="fas fa-redo me-2"></i>Reset
@@ -87,23 +87,31 @@
         </div>
         <div class="card-body">
           <div class="row gy-3">
-            <div class="col-md-4">
-              <label for="attendanceDate" class="form-label">Date</label>
-              <input type="date" class="form-control" id="attendanceDate">
-            </div>
-            <div class="col-md-4">
-              <label for="subjectSelect" class="form-label">Subject</label>
-              <select class="form-select" id="subjectSelect">
-                <option value="">Select subject</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="English">English</option>
-                <option value="Science">Science</option>
-                <option value="History">History</option>
-                <option value="Computer Science">Computer Science</option>
+            <div class="col-md-3">
+              <label for="attCourse" class="form-label">Course</label>
+              <select class="form-select" id="attCourse" onchange="updateAttSemesterOptions()">
+                <option value="">Select a course</option>
               </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label d-block">&nbsp;</label>
+            <div class="col-md-3">
+              <label for="attSemester" class="form-label">Semester</label>
+              <select class="form-select" id="attSemester" onchange="updateAttPaperOptions()" disabled>
+                <option value="">Select a semester</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="attPaper" class="form-label">Paper</label>
+              <select class="form-select" id="attPaper" onchange="loadStudentsForAttendance()" disabled>
+                <option value="">Select a paper</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="attendanceDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="attendanceDate" onchange="loadExistingAttendance()">
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-12">
               <button class="btn btn-primary w-100" id="submitAttendanceBtn" onclick="submitAttendance()">
                 <i class="fas fa-paper-plane me-2"></i>Save Attendance
               </button>
@@ -139,6 +147,8 @@
                 <tr>
                   <th>Name</th>
                   <th>Roll No</th>
+                  <th>Course</th>
+                  <th>Semester</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -157,6 +167,11 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let students = []
+    let courses = []
+    let allPapers = []
+    let selectedCourseId = null
+    let selectedSemester = null
+    let selectedPaperId = null
     const attendanceState = {}
 
     function setAlert(message = "", type = "danger") {
@@ -173,6 +188,7 @@
 
     function setSubmitState(isSaving) {
       const button = document.getElementById("submitAttendanceBtn")
+      if (!button) return
       button.disabled = isSaving
       button.innerHTML = isSaving
         ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...'
@@ -199,17 +215,27 @@
         : `Showing ${list.length} of ${students.length} students`
 
       if (list.length === 0) {
+        const hasFilters = selectedCourseId && selectedSemester && selectedPaperId
         const searchQuery = document.getElementById("searchStudent").value.trim()
-        tableBody.innerHTML = searchQuery
-          ? '<tr><td colspan="3" class="text-center py-5 text-muted">No students match your search.</td></tr>'
-          : '<tr><td colspan="3" class="text-center py-5 text-muted">No students found. Add students first.</td></tr>'
+        
+        if (hasFilters) {
+          tableBody.innerHTML = searchQuery
+            ? '<tr><td colspan="5" class="text-center py-5 text-muted">No students match your search.</td></tr>'
+            : '<tr><td colspan="5" class="text-center py-5 text-muted">No students found for this course/semester/paper.</td></tr>'
+        } else {
+          tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Please select course, semester, and paper to load students.</td></tr>'
+        }
         return
       }
 
-      tableBody.innerHTML = list.map(student => `
+      tableBody.innerHTML = list.map(student => {
+        const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
+        return `
         <tr>
           <td>${window.escapeHtml(student.name)}</td>
           <td>${window.escapeHtml(student.roll)}</td>
+          <td>${window.escapeHtml(courseName)}</td>
+          <td>${student.semester}</td>
           <td>
             <select class="form-select form-select-sm" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
               <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
@@ -218,7 +244,8 @@
             </select>
           </td>
         </tr>
-      `).join("")
+      `
+      }).join("")
     }
 
     function applySearch() {
@@ -228,10 +255,14 @@
         return
       }
 
-      const filtered = students.filter(student =>
-        student.name.toLowerCase().includes(query) ||
-        student.roll.toLowerCase().includes(query)
-      )
+      const filtered = students.filter(student => {
+        const courseName = courses.find(c => c.id === student.course_id)?.name || ""
+        return (
+          student.name.toLowerCase().includes(query) ||
+          student.roll.toLowerCase().includes(query) ||
+          courseName.toLowerCase().includes(query)
+        )
+      })
 
       renderAttendanceTable(filtered)
     }
@@ -244,9 +275,125 @@
       updateSummary()
     }
 
+    window.updateAttSemesterOptions = async function() {
+      const courseSelect = document.getElementById("attCourse")
+      const semesterSelect = document.getElementById("attSemester")
+      const paperSelect = document.getElementById("attPaper")
+      
+      selectedCourseId = courseSelect.value ? Number(courseSelect.value) : null
+      selectedSemester = null
+      selectedPaperId = null
+      
+      semesterSelect.disabled = true
+      semesterSelect.innerHTML = '<option value="">Select a semester</option>'
+      paperSelect.disabled = true
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
+      
+      if (!selectedCourseId) {
+        students = []
+        resetAttendanceState("absent")
+        renderAttendanceTable(students)
+        return
+      }
+
+      try {
+        const semesters = await window.apiRequest(`/courses/${selectedCourseId}/semesters`)
+        semesterSelect.disabled = false
+        
+        semesters.forEach(semester => {
+          const option = document.createElement("option")
+          option.value = semester
+          option.textContent = `Semester ${semester}`
+          semesterSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load semesters for this course.")
+      }
+    }
+
+    window.updateAttPaperOptions = async function() {
+      const semesterSelect = document.getElementById("attSemester")
+      const paperSelect = document.getElementById("attPaper")
+      
+      selectedSemester = semesterSelect.value ? Number(semesterSelect.value) : null
+      selectedPaperId = null
+      
+      paperSelect.disabled = true
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
+      
+      if (!selectedCourseId || !selectedSemester) {
+        students = []
+        resetAttendanceState("absent")
+        renderAttendanceTable(students)
+        return
+      }
+
+      try {
+        allPapers = await window.apiRequest(`/courses/${selectedCourseId}/semesters/${selectedSemester}/papers`)
+        paperSelect.disabled = false
+        
+        allPapers.forEach(paper => {
+          const option = document.createElement("option")
+          option.value = paper.id
+          option.textContent = paper.name + (paper.code ? ` (${paper.code})` : "")
+          paperSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load papers for this course/semester.")
+        allPapers = []
+      }
+    }
+
+    window.loadStudentsForAttendance = async function() {
+      const paperSelect = document.getElementById("attPaper")
+      selectedPaperId = paperSelect.value ? Number(paperSelect.value) : null
+
+      if (!selectedCourseId || !selectedSemester || !selectedPaperId) {
+        students = []
+        resetAttendanceState("absent")
+        renderAttendanceTable(students)
+        return
+      }
+
+      setAlert("")
+      document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Loading students...</td></tr>'
+
+      try {
+        const allStudents = await window.apiRequest("/students")
+        students = allStudents.filter(student => 
+          student.course_id === selectedCourseId && 
+          student.semester === selectedSemester &&
+          (Array.isArray(student.papers) ? student.papers : JSON.parse(student.papers || "[]")).includes(selectedPaperId)
+        )
+        resetAttendanceState("absent")
+        await loadExistingAttendance()
+      } catch (error) {
+        document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Unable to load students.</td></tr>'
+        setAlert(error.message || "Unable to load students right now.")
+      }
+    }
+
+    async function loadCourses() {
+      try {
+        courses = await window.apiRequest("/courses")
+        const courseSelect = document.getElementById("attCourse")
+        courseSelect.innerHTML = '<option value="">Select a course</option>'
+        
+        courses.forEach(course => {
+          const option = document.createElement("option")
+          option.value = course.id
+          option.textContent = course.name
+          courseSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load courses.")
+      }
+    }
+
     async function loadExistingAttendance() {
       const date = document.getElementById("attendanceDate").value
-      const subject = document.getElementById("subjectSelect").value
+      const paper = allPapers.find(p => p.id === selectedPaperId)
+      const paperName = paper ? paper.name : ""
 
       if (!students.length) {
         return
@@ -254,14 +401,14 @@
 
       resetAttendanceState("absent")
 
-      if (!date || !subject) {
+      if (!date || !paperName) {
         applySearch()
         return
       }
 
       try {
         const records = await window.apiRequest("/attendance", {
-          query: { start_date: date, end_date: date, subject }
+          query: { start_date: date, end_date: date, subject: paperName }
         })
 
         records.forEach(record => {
@@ -272,7 +419,7 @@
         applySearch()
 
         if (records.length > 0) {
-          setAlert(`Loaded ${records.length} saved attendance record${records.length === 1 ? "" : "s"} for ${subject} on ${window.formatDate(date)}.`, "info")
+          setAlert(`Loaded ${records.length} saved attendance record${records.length === 1 ? "" : "s"} for ${paperName} on ${window.formatDate(date)}.`, "info")
         } else {
           setAlert("", "danger")
         }
@@ -282,29 +429,21 @@
       }
     }
 
-    async function loadStudents() {
-      setAlert("")
-      document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">Loading students...</td></tr>'
-
-      try {
-        students = await window.apiRequest("/students")
-        resetAttendanceState("absent")
-        await loadExistingAttendance()
-      } catch (error) {
-        document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">Unable to load student list right now.</td></tr>'
-        setAlert(error.message || "Unable to load students right now.")
-      }
-    }
-
     window.updateAttendanceStatus = function(studentId, status) {
       attendanceState[studentId] = status
       updateSummary()
     }
 
     window.resetAttendance = function() {
+      document.getElementById("attCourse").selectedIndex = 0
+      document.getElementById("attSemester").selectedIndex = 0
+      document.getElementById("attPaper").selectedIndex = 0
       document.getElementById("attendanceDate").value = window.getTodayLocalDate()
-      document.getElementById("subjectSelect").selectedIndex = 0
       document.getElementById("searchStudent").value = ""
+      selectedCourseId = null
+      selectedSemester = null
+      selectedPaperId = null
+      students = []
       resetAttendanceState("absent")
       renderAttendanceTable(students)
       setAlert("")
@@ -312,15 +451,16 @@
 
     window.submitAttendance = async function() {
       const date = document.getElementById("attendanceDate").value
-      const subject = document.getElementById("subjectSelect").value
+      const paper = allPapers.find(p => p.id === selectedPaperId)
+      const paperName = paper ? paper.name : ""
 
-      if (!date || !subject) {
-        setAlert("Please select both a date and a subject before saving attendance.")
+      if (!date || !paperName) {
+        setAlert("Please select course, semester, paper, and date before saving attendance.")
         return
       }
 
       if (!students.length) {
-        setAlert("No students are available yet. Add students first.")
+        setAlert("No students are available for this selection.")
         return
       }
 
@@ -331,7 +471,7 @@
         const records = students.map(student => ({
           student_id: Number(student.id),
           date,
-          subject,
+          subject: paperName,
           status: attendanceState[student.id] || "absent"
         }))
 
@@ -357,9 +497,7 @@
       window.setupSidebar()
       document.getElementById("attendanceDate").value = window.getTodayLocalDate()
       document.getElementById("searchStudent").addEventListener("input", applySearch)
-      document.getElementById("attendanceDate").addEventListener("change", loadExistingAttendance)
-      document.getElementById("subjectSelect").addEventListener("change", loadExistingAttendance)
-      loadStudents()
+      loadCourses()
     })
   </script>
 </body>
