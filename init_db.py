@@ -8,7 +8,7 @@ import sys
 def load_env_file():
     env_path = Path(__file__).resolve().parent / ".env"
     if not env_path.exists():
-        print("❌ .env file not found!")
+        print("[ERROR] .env file not found!")
         return False
 
     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
@@ -38,7 +38,7 @@ def initialize_database():
 
     config = get_db_config()
     
-    print(f"🔄 Connecting to Railway MySQL database...")
+    print(f"[*] Connecting to Railway MySQL database...")
     print(f"   Host: {config['host']}")
     print(f"   Port: {config['port']}")
     print(f"   Database: {config['database']}")
@@ -57,7 +57,7 @@ def initialize_database():
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'users' table")
+        print("[OK] Created 'users' table")
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS courses (
@@ -68,7 +68,7 @@ def initialize_database():
           INDEX idx_name (name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'courses' table")
+        print("[OK] Created 'courses' table")
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS course_semesters (
@@ -80,7 +80,7 @@ def initialize_database():
           UNIQUE KEY unique_course_semester (course_id, semester)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'course_semesters' table")
+        print("[OK] Created 'course_semesters' table")
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS papers (
@@ -94,7 +94,7 @@ def initialize_database():
           UNIQUE KEY unique_paper (course_id, semester, name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'papers' table")
+        print("[OK] Created 'papers' table")
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
@@ -115,7 +115,7 @@ def initialize_database():
           INDEX idx_semester (semester)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'students' table")
+        print("[OK] Created 'students' table")
         
         # Check and add missing columns to students table
         columns_to_check = {
@@ -133,11 +133,23 @@ def initialize_database():
             if not cursor.fetchone():
                 try:
                     cursor.execute(alter_query)
-                    print(f"✅ Added '{col_name}' column to students table")
+                    print(f"[OK] Added '{col_name}' column to students table")
                 except Exception as e:
-                    print(f"⚠️  Could not add '{col_name}' column: {str(e)}")
+                    print(f"[WARN] Could not add '{col_name}' column: {str(e)}")
             else:
-                print(f"ℹ️  '{col_name}' column already exists in students table")
+                print(f"[INFO] '{col_name}' column already exists in students table")
+        
+        # Remove 'class' column if it exists (old schema)
+        cursor.execute("""
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = 'students' AND COLUMN_NAME = 'class'
+        """)
+        if cursor.fetchone():
+            try:
+                cursor.execute("ALTER TABLE students DROP COLUMN class")
+                print("[OK] Removed old 'class' column from students table")
+            except Exception as e:
+                print(f"[WARN] Could not remove 'class' column: {str(e)}")
         
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS attendance (
@@ -155,7 +167,7 @@ def initialize_database():
           INDEX idx_student_id (student_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        print("✅ Created 'attendance' table")
+        print("[OK] Created 'attendance' table")
         
         # Insert sample courses
         cursor.execute("SELECT COUNT(*) as count FROM courses")
@@ -170,7 +182,7 @@ def initialize_database():
                 "INSERT INTO courses (name, code) VALUES (%s, %s)",
                 sample_courses
             )
-            print("✅ Inserted sample courses")
+            print("[OK] Inserted sample courses")
         
         # Get course IDs for inserting semesters and papers
         cursor.execute("SELECT id, name FROM courses ORDER BY name")
@@ -188,7 +200,7 @@ def initialize_database():
                     "INSERT INTO course_semesters (course_id, semester) VALUES (%s, %s)",
                     semesters
                 )
-        print("✅ Inserted sample semesters (1-8 for each course)")
+        print("[OK] Inserted sample semesters (1-8 for each course)")
         
         # Insert sample papers
         sample_papers = {
@@ -232,19 +244,162 @@ def initialize_database():
                                 "INSERT INTO papers (course_id, semester, name, code) VALUES (%s, %s, %s, %s)",
                                 (course_id, semester, paper_name, paper_code)
                             )
-        print("✅ Inserted sample papers")
+        print("[OK] Inserted sample papers")
+        
+        # Insert sample students
+        cursor.execute("SELECT COUNT(*) as count FROM students")
+        if cursor.fetchone()['count'] == 0:
+            import json
+            
+            # Get course IDs and paper IDs for sample data
+            sample_students = [
+                # BSc Students
+                {
+                    "name": "Rahul Kumar",
+                    "roll": "BSC001",
+                    "course_name": "Bachelor of Science",
+                    "semester": 1,
+                    "papers": ["Physics I", "Chemistry I"],
+                    "email": "rahul.kumar@students.com",
+                    "phone": "9876543210"
+                },
+                {
+                    "name": "Priya Singh",
+                    "roll": "BSC002",
+                    "course_name": "Bachelor of Science",
+                    "semester": 1,
+                    "papers": ["Physics I", "Biology I"],
+                    "email": "priya.singh@students.com",
+                    "phone": "9876543211"
+                },
+                {
+                    "name": "Amit Patel",
+                    "roll": "BSC003",
+                    "course_name": "Bachelor of Science",
+                    "semester": 2,
+                    "papers": ["Physics II", "Chemistry II"],
+                    "email": "amit.patel@students.com",
+                    "phone": "9876543212"
+                },
+                # BCA Students
+                {
+                    "name": "Neha Verma",
+                    "roll": "BCA001",
+                    "course_name": "Bachelor of Computer Applications",
+                    "semester": 1,
+                    "papers": ["Programming Fundamentals", "Digital Logic"],
+                    "email": "neha.verma@students.com",
+                    "phone": "8765432101"
+                },
+                {
+                    "name": "Sanjay Sharma",
+                    "roll": "BCA002",
+                    "course_name": "Bachelor of Computer Applications",
+                    "semester": 1,
+                    "papers": ["Mathematics I", "Digital Logic"],
+                    "email": "sanjay.sharma@students.com",
+                    "phone": "8765432102"
+                },
+                {
+                    "name": "Anjali Desai",
+                    "roll": "BCA003",
+                    "course_name": "Bachelor of Computer Applications",
+                    "semester": 2,
+                    "papers": ["Object Oriented Programming", "Database Management"],
+                    "email": "anjali.desai@students.com",
+                    "phone": "8765432103"
+                },
+                # Bvoc IT Students
+                {
+                    "name": "Vikram Singh",
+                    "roll": "BVOC-IT001",
+                    "course_name": "Bachelor of Vocational Studies - Information Technology",
+                    "semester": 1,
+                    "papers": ["IT Fundamentals", "Hardware Basics"],
+                    "email": "vikram.singh@students.com",
+                    "phone": "7654321098"
+                },
+                {
+                    "name": "Divya Gupta",
+                    "roll": "BVOC-IT002",
+                    "course_name": "Bachelor of Vocational Studies - Information Technology",
+                    "semester": 1,
+                    "papers": ["Networking I", "IT Fundamentals"],
+                    "email": "divya.gupta@students.com",
+                    "phone": "7654321099"
+                },
+                # Bvoc Food Students
+                {
+                    "name": "Karan Reddy",
+                    "roll": "BVOC-FOOD001",
+                    "course_name": "Bachelor of Vocational Studies - Food Technology",
+                    "semester": 1,
+                    "papers": ["Food Science Basics", "Food Safety"],
+                    "email": "karan.reddy@students.com",
+                    "phone": "6543210987"
+                },
+                {
+                    "name": "Sneha Nair",
+                    "roll": "BVOC-FOOD002",
+                    "course_name": "Bachelor of Vocational Studies - Food Technology",
+                    "semester": 1,
+                    "papers": ["Nutrition I", "Food Safety"],
+                    "email": "sneha.nair@students.com",
+                    "phone": "6543210988"
+                },
+            ]
+            
+            for student_data in sample_students:
+                # Get course ID
+                cursor.execute("SELECT id FROM courses WHERE name = %s", (student_data["course_name"],))
+                course_result = cursor.fetchone()
+                if not course_result:
+                    continue
+                
+                course_id = course_result['id']
+                semester = student_data["semester"]
+                
+                # Get paper IDs for this student
+                paper_ids = []
+                for paper_name in student_data["papers"]:
+                    cursor.execute(
+                        "SELECT id FROM papers WHERE course_id = %s AND semester = %s AND name = %s",
+                        (course_id, semester, paper_name)
+                    )
+                    paper_result = cursor.fetchone()
+                    if paper_result:
+                        paper_ids.append(paper_result['id'])
+                
+                # Insert student if roll and email don't exist
+                cursor.execute("SELECT id FROM students WHERE roll = %s OR email = %s", 
+                             (student_data["roll"], student_data["email"]))
+                if not cursor.fetchone():
+                    cursor.execute(
+                        "INSERT INTO students (name, roll, course_id, semester, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            student_data["name"],
+                            student_data["roll"],
+                            course_id,
+                            semester,
+                            json.dumps(paper_ids),
+                            student_data["email"],
+                            student_data["phone"]
+                        )
+                    )
+            
+            print("[OK] Inserted sample students")
         
         conn.commit()
-        print("\n✨ Database initialization successful!")
+        print("\n[SUCCESS] Database initialization successful!")
         return True
         
     except mysql.connector.Error as err:
         # Handle database-specific errors
-        print(f"\n❌ Database Error: {err}")
+        print(f"\n[ERROR] Database Error: {err}")
         return False
     except Exception as err:
         # Handle unexpected errors
-        print(f"\n❌ Unexpected Error: {err}")
+        print(f"\n[ERROR] Unexpected Error: {err}")
         return False
     finally:
         # Always close connections
