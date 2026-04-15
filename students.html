@@ -102,6 +102,7 @@
                   <th>Roll No</th>
                   <th>Course</th>
                   <th>Semester</th>
+                  <th>Batch</th>
                   <th>Email</th>
                   <th>Phone</th>
                   <th class="text-center">Actions</th>
@@ -109,7 +110,7 @@
               </thead>
               <tbody id="studentsTable">
                 <tr>
-                  <td colspan="6" class="text-center py-5 text-muted">Loading students...</td>
+                  <td colspan="8" class="text-center py-5 text-muted">Loading students...</td>
                 </tr>
               </tbody>
             </table>
@@ -147,6 +148,10 @@
               <select class="form-control" id="studentSemester" required onchange="updatePaperOptions()" disabled>
                 <option value="">Select a semester</option>
               </select>
+            </div>
+            <div class="mb-3">
+              <label for="admissionYear" class="form-label">Admission Year</label>
+              <input type="number" class="form-control" id="admissionYear" placeholder="Enter admission year (e.g., 2023)" min="2000" max="2100" required>
             </div>
             <div class="mb-3">
               <label for="studentPapers" class="form-label">Papers (Select 1-4)</label>
@@ -221,12 +226,14 @@
 
       tableBody.innerHTML = list.map(student => {
         const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
+        const batch = student.batch || "N/A"
         return `
           <tr>
             <td>${window.escapeHtml(student.name)}</td>
             <td>${window.escapeHtml(student.roll)}</td>
             <td>${window.escapeHtml(courseName)}</td>
             <td>${student.semester}</td>
+            <td><span class="badge bg-info">${window.escapeHtml(batch)}</span></td>
             <td>${window.escapeHtml(student.email)}</td>
             <td>${window.escapeHtml(student.phone || "-")}</td>
             <td class="text-center">
@@ -251,10 +258,12 @@
 
       const filtered = students.filter(student => {
         const courseName = courses.find(c => c.id === student.course_id)?.name || ""
+        const batch = student.batch || ""
         return (
           student.name.toLowerCase().includes(query) ||
           student.roll.toLowerCase().includes(query) ||
           courseName.toLowerCase().includes(query) ||
+          batch.toLowerCase().includes(query) ||
           student.email.toLowerCase().includes(query) ||
           (student.phone && student.phone.toLowerCase().includes(query))
         )
@@ -334,13 +343,13 @@
 
     async function loadStudents() {
       setAlert("")
-      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Loading students...</td></tr>'
+      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Loading students...</td></tr>'
 
       try {
         students = await window.apiRequest("/students")
         applySearch()
       } catch (error) {
-        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Unable to load students right now.</td></tr>'
+        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Unable to load students right now.</td></tr>'
         setAlert(error.message || "Unable to load students right now.")
       }
     }
@@ -392,6 +401,7 @@
       document.getElementById("studentCourse").value = student.course_id
       document.getElementById("studentEmail").value = student.email
       document.getElementById("studentPhone").value = student.phone || ""
+      document.getElementById("admissionYear").value = student.admission_year || ""
       setSaveButtonState(false)
       
       // Load semester options for this course
@@ -416,6 +426,7 @@
       const roll = document.getElementById("rollNumber").value.trim()
       const courseId = document.getElementById("studentCourse").value.trim()
       const semester = document.getElementById("studentSemester").value.trim()
+      const admissionYear = document.getElementById("admissionYear").value.trim()
       const email = document.getElementById("studentEmail").value.trim().toLowerCase()
       const phone = document.getElementById("studentPhone").value.trim()
       
@@ -424,7 +435,7 @@
         document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
       ).map(checkbox => Number(checkbox.value))
 
-      if (!name || !roll || !courseId || !semester || !email || !phone) {
+      if (!name || !roll || !courseId || !semester || !admissionYear || !email || !phone) {
         setAlert("Please fill in all student fields.")
         return
       }
@@ -443,6 +454,7 @@
           roll,
           course_id: Number(courseId),
           semester: Number(semester),
+          admission_year: Number(admissionYear),
           papers: selectedPapers,
           email,
           phone,

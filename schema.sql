@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS students (
   roll VARCHAR(50) NOT NULL UNIQUE,
   course_id INT NOT NULL,
   semester INT NOT NULL,
+  admission_year INT NOT NULL,
   papers JSON,
   email VARCHAR(255) NOT NULL UNIQUE,
   phone VARCHAR(20),
@@ -49,7 +50,8 @@ CREATE TABLE IF NOT EXISTS students (
   INDEX idx_roll (roll),
   INDEX idx_email (email),
   INDEX idx_course_id (course_id),
-  INDEX idx_semester (semester)
+  INDEX idx_semester (semester),
+  INDEX idx_admission_year (admission_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS attendance (

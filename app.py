@@ -75,7 +75,7 @@ def get_db_config():
     return {
         "host": os.environ.get("ATTENDANCE_DB_HOST", "localhost"),
         "user": os.environ.get("ATTENDANCE_DB_USER", "root"),
-        "password": os.environ.get("ATTENDANCE_DB_PASSWORD", "bishal&8822"),
+        "password": os.environ.get("ATTENDANCE_DB_PASSWORD"),
         "database": os.environ.get("ATTENDANCE_DB_NAME", "attendance_system"),
         "port": int(os.environ.get("ATTENDANCE_DB_PORT", "3306")),
     }
@@ -165,6 +165,35 @@ def serialize_row(row):
     return {key: serialize_value(value) for key, value in row.items()}
 
 
+def add_batch_to_student(student):
+    """Add batch information to a student record"""
+    conn = cursor = None
+    try:
+        if 'admission_year' not in student:
+            return student
+            
+        student = student.copy()
+        admission_year = student.get('admission_year')
+        course_id = student.get('course_id')
+        
+        # Query course to check if BSc
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
+        course = cursor.fetchone()
+        
+        is_bsc = course and 'BSc' in course.get('name', '')
+        duration = 4 if is_bsc else 3
+        end_year = admission_year + duration - 1
+        student['batch'] = f"{admission_year}-{end_year}"
+        
+        return student
+    except:
+        return student
+    finally:
+        close_db(conn, cursor)
+
+
 # ========== DATA VALIDATION FUNCTIONS ==========
 def normalize_email(raw_email):
     """Normalize email: lowercase and strip whitespace"""
@@ -248,6 +277,38 @@ def parse_json_body(expected_type=dict):
     return data
 
 
+def calculate_batch(admission_year, course_id, course_duration_map=None):
+    # Calculate batch (e.g., 2023-2027 for BSc, 2023-2026 for other courses)
+    # BSc is 4 years, others are 3 years
+    # course_duration_map is used for testing, otherwise queries DB
+    if course_duration_map is None:
+        course_duration_map = {}
+    
+    # Check if this is a BSc course (4 years duration)
+    is_bsc = False
+    
+    if course_id in course_duration_map:
+        duration = course_duration_map[course_id]
+    else:
+        # Query database to check course name
+        conn = cursor = None
+        try:
+            conn = get_db()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
+            course = cursor.fetchone()
+            if course and 'BSc' in course.get('name', ''):
+                is_bsc = True
+        except:
+            pass
+        finally:
+            close_db(conn, cursor)
+    
+    duration = 4 if is_bsc else 3
+    end_year = admission_year + duration - 1
+    return f"{admission_year}-{end_year}"
+
+
 def validate_login_payload(data):
     # Validate login request payload
     email = normalize_email(data.get("email"))
@@ -268,12 +329,13 @@ def validate_student_payload(data):
     roll = normalize_text(data.get("roll"))
     course_id = data.get("course_id")
     semester = data.get("semester")
+    admission_year = data.get("admission_year")
     papers = data.get("papers", [])
     email = normalize_email(data.get("email"))
     phone = normalize_text(data.get("phone", ""))
 
-    if not all([name, roll, course_id, semester, email, phone]):
-        return None, "All student fields (name, roll, course, semester, email, phone) are required."
+    if not all([name, roll, course_id, semester, admission_year, email, phone]):
+        return None, "All student fields (name, roll, course, semester, admission year, email, phone) are required."
 
     if not is_valid_email(email):
         return None, "Please enter a valid student email address."
@@ -285,8 +347,14 @@ def validate_student_payload(data):
     try:
         course_id = int(course_id)
         semester = int(semester)
+        admission_year = int(admission_year)
     except (TypeError, ValueError):
-        return None, "Course ID and semester must be valid numbers."
+        return None, "Course ID, semester, and admission year must be valid numbers."
+
+    # Validate admission year is reasonable (within last 20 years or next 2 years)
+    current_year = datetime.now().year
+    if admission_year < current_year - 20 or admission_year > current_year + 2:
+        return None, f"Admission year must be between {current_year - 20} and {current_year + 2}."
 
     if semester < 1 or semester > 8:
         return None, "Semester must be between 1 and 8."
@@ -299,6 +367,7 @@ def validate_student_payload(data):
         "roll": roll,
         "course_id": course_id,
         "semester": semester,
+        "admission_year": admission_year,
         "papers": papers,
         "email": email,
         "phone": phone,
@@ -480,8 +549,8 @@ def get_students():
         cursor = conn.cursor(dictionary=True)
         # Retrieve all students, sorted by name then by roll number
         cursor.execute("SELECT * FROM students ORDER BY name ASC, roll ASC")
-        # Serialize each row to handle datetime conversion
-        data = [serialize_row(row) for row in cursor.fetchall()]
+        # Serialize each row to handle datetime conversion and add batch info
+        data = [add_batch_to_student(serialize_row(row)) for row in cursor.fetchall()]
         return jsonify(data)
     except mysql.connector.Error:
         return json_error("Unable to load students right now.", 500)
@@ -538,12 +607,13 @@ def add_student():
             return json_error("Roll number or email already exists.", 409)
 
         cursor.execute(
-            "INSERT INTO students (name, roll, course_id, semester, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            "INSERT INTO students (name, roll, course_id, semester, admission_year, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 student["name"],
                 student["roll"],
                 student["course_id"],
                 student["semester"],
+                student["admission_year"],
                 json.dumps(student["papers"]),
                 student["email"],
                 student["phone"],
@@ -553,7 +623,7 @@ def add_student():
 
         student_id = cursor.lastrowid
         cursor.execute("SELECT * FROM students WHERE id = %s", (student_id,))
-        created_student = serialize_row(cursor.fetchone())
+        created_student = add_batch_to_student(serialize_row(cursor.fetchone()))
         return jsonify({
             "message": "Student added successfully.",
             "student": created_student,
@@ -619,12 +689,13 @@ def update_student(student_id):
 
         # Update student record with new values
         cursor.execute(
-            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
+            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, admission_year = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
             (
                 student["name"],
                 student["roll"],
                 student["course_id"],
                 student["semester"],
+                student["admission_year"],
                 json.dumps(student["papers"]),
                 student["email"],
                 student["phone"],
@@ -634,7 +705,7 @@ def update_student(student_id):
         conn.commit()
 
         cursor.execute("SELECT * FROM students WHERE id = %s", (student_id,))
-        updated_student = serialize_row(cursor.fetchone())
+        updated_student = add_batch_to_student(serialize_row(cursor.fetchone()))
         return jsonify({
             "message": "Student updated successfully.",
             "student": updated_student,
