@@ -360,7 +360,8 @@
       if (!course) return
       
       // Check if BSc course (4 years) or other (3 years)
-      const isBSc = course.name.includes("BSc")
+      // Check for both "BSc" and "Bachelor of Science"
+      const isBSc = course.name.includes("BSc") || course.name.includes("Bachelor of Science")
       const duration = isBSc ? 4 : 3
       const endYear = year + duration - 1
       const batch = `${year}-${endYear}`

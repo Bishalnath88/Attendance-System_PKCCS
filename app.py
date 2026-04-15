@@ -186,13 +186,14 @@ def add_batch_to_student(student):
         admission_year = student.get('admission_year')
         course_id = student.get('course_id')
         
-        # Query course to check if BSc
+        # Query course to check if BSc (4 years) or other (3 years)
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
         course = cursor.fetchone()
         
-        is_bsc = course and 'BSc' in course.get('name', '')
+        # Check for both "BSc" and "Bachelor of Science"
+        is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
         duration = 4 if is_bsc else 3
         end_year = admission_year + duration - 1
         student['batch'] = f"{admission_year}-{end_year}"
@@ -307,7 +308,7 @@ def calculate_batch(admission_year, course_id, course_duration_map=None):
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
             course = cursor.fetchone()
-            if course and 'BSc' in course.get('name', ''):
+            if course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', '')):
                 is_bsc = True
         except:
             pass
