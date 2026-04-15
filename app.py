@@ -195,7 +195,7 @@ def add_batch_to_student(student):
         # Check for both "BSc" and "Bachelor of Science"
         is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
         duration = 4 if is_bsc else 3
-        end_year = admission_year + duration - 1
+        end_year = admission_year + duration
         student['batch'] = f"{admission_year}-{end_year}"
         
         return student
@@ -316,7 +316,7 @@ def calculate_batch(admission_year, course_id, course_duration_map=None):
             close_db(conn, cursor)
     
     duration = 4 if is_bsc else 3
-    end_year = admission_year + duration - 1
+    end_year = admission_year + duration
     return f"{admission_year}-{end_year}"
 
 

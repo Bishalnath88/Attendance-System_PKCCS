@@ -363,7 +363,7 @@
       // Check for both "BSc" and "Bachelor of Science"
       const isBSc = course.name.includes("BSc") || course.name.includes("Bachelor of Science")
       const duration = isBSc ? 4 : 3
-      const endYear = year + duration - 1
+      const endYear = year + duration
       const batch = `${year}-${endYear}`
       
       batchInfo.textContent = `Batch: ${batch} (${duration}-year course)`
