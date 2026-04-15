@@ -66,8 +66,6 @@ SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
 ACTIVE_TOKENS = {}
 # Minimum password column size for hashed passwords
 PASSWORD_COLUMN_MIN_LENGTH = 255
-# Flag to track database schema initialization
-SCHEMA_BOOTSTRAPPED = False
 
 
 def get_db_config():
@@ -82,58 +80,51 @@ def get_db_config():
 
 
 def ensure_database_schema():
-    # Ensure database schema exists and all required columns are properly configured
-    global SCHEMA_BOOTSTRAPPED
-
-    if SCHEMA_BOOTSTRAPPED:
-        return
-
+    """
+    Ensures the database has all required columns and proper configurations.
+    This function is called on every database connection to keep schema up-to-date.
+    """
     conn = cursor = None
     try:
         conn = mysql.connector.connect(**get_db_config())
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SHOW TABLES LIKE 'users'")
-        if not cursor.fetchone():
-            SCHEMA_BOOTSTRAPPED = True
-            return
-
+        
+        # Step 1: Fix password column size if needed
         cursor.execute("SHOW COLUMNS FROM users LIKE 'password'")
-        column = cursor.fetchone()
-        if not column:
-            SCHEMA_BOOTSTRAPPED = True
-            return
-
-        column_type = str(column.get("Type", "")).lower()
-        match = re.search(r"varchar\((\d+)\)", column_type)
-
-        if match and int(match.group(1)) < PASSWORD_COLUMN_MIN_LENGTH:
-            cursor.execute(
-                f"ALTER TABLE users MODIFY COLUMN password VARCHAR({PASSWORD_COLUMN_MIN_LENGTH})"
-            )
-            conn.commit()
-
-        # Check and add admission_year column if it doesn't exist
-        cursor.execute(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
-            "WHERE TABLE_NAME='students' AND COLUMN_NAME='admission_year'"
-        )
-        if not cursor.fetchone():
-            # Add admission_year column if missing
-            try:
+        password_column = cursor.fetchone()
+        
+        if password_column:
+            column_type = str(password_column.get("Type", "")).lower()
+            match = re.search(r"varchar\((\d+)\)", column_type)
+            
+            # If password column is too small for hashed passwords, enlarge it
+            if match and int(match.group(1)) < PASSWORD_COLUMN_MIN_LENGTH:
                 cursor.execute(
-                    "ALTER TABLE students ADD COLUMN admission_year INT DEFAULT 2026 AFTER semester"
-                )
-                cursor.execute(
-                    "CREATE INDEX idx_admission_year ON students(admission_year)"
+                    f"ALTER TABLE users MODIFY COLUMN password VARCHAR({PASSWORD_COLUMN_MIN_LENGTH})"
                 )
                 conn.commit()
-            except mysql.connector.Error as e:
-                if "Duplicate column name" not in str(e):
-                    pass  # Column might exist or other non-critical error
-
-        SCHEMA_BOOTSTRAPPED = True
-    except mysql.connector.Error:
-        # Let the main request surface any connection errors
+        
+        # Step 2: Add admission_year column if it's missing from students table
+        cursor.execute(
+            "SELECT COUNT(*) as col_count FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_NAME='students' AND COLUMN_NAME='admission_year'"
+        )
+        result = cursor.fetchone()
+        
+        if result and result['col_count'] == 0:
+            # Column doesn't exist, so add it
+            cursor.execute(
+                "ALTER TABLE students ADD COLUMN admission_year INT DEFAULT 2026 AFTER semester"
+            )
+            # Also create an index for faster queries
+            cursor.execute(
+                "CREATE INDEX idx_admission_year ON students(admission_year)"
+            )
+            conn.commit()
+    
+    except mysql.connector.Error as e:
+        # Database might not be ready yet, which is OK
+        # System will try again on next request
         pass
     finally:
         if cursor is not None:
