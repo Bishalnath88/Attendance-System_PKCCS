@@ -139,7 +139,7 @@
             </div>
             <div class="mb-3">
               <label for="studentCourse" class="form-label">Course</label>
-              <select class="form-control" id="studentCourse" required onchange="updateSemesterOptions()">
+              <select class="form-control" id="studentCourse" required onchange="updateSemesterOptions(); updateBatchDisplay()">
                 <option value="">Select a course</option>
               </select>
             </div>
@@ -150,8 +150,11 @@
               </select>
             </div>
             <div class="mb-3">
-              <label for="admissionYear" class="form-label">Admission Year (Optional)</label>
-              <input type="number" class="form-control" id="admissionYear" placeholder="Enter admission year (e.g., 2023) - defaults to current year" min="2000" max="2100">
+              <label for="admissionYear" class="form-label">Admission Year</label>
+              <select class="form-control" id="admissionYear" required onchange="updateBatchDisplay()">
+                <option value="">Select admission year</option>
+              </select>
+              <small class="text-muted" id="batchInfo"></small>
             </div>
             <div class="mb-3">
               <label for="studentPapers" class="form-label">Papers (Select 1-4)</label>
@@ -341,6 +344,47 @@
       papersLabel.textContent = `Papers (Select 1-4) - Selected: ${count}`
     }
 
+    window.updateBatchDisplay = function() {
+      const courseId = document.getElementById("studentCourse").value
+      const admissionYear = document.getElementById("admissionYear").value
+      const batchInfo = document.getElementById("batchInfo")
+      
+      if (!courseId || !admissionYear) {
+        batchInfo.textContent = ""
+        return
+      }
+      
+      const course = courses.find(c => c.id === Number(courseId))
+      const year = Number(admissionYear)
+      
+      if (!course) return
+      
+      // Check if BSc course (4 years) or other (3 years)
+      const isBSc = course.name.includes("BSc")
+      const duration = isBSc ? 4 : 3
+      const endYear = year + duration - 1
+      const batch = `${year}-${endYear}`
+      
+      batchInfo.textContent = `Batch: ${batch} (${duration}-year course)`
+    }
+
+    async function loadAdmissionYears() {
+      try {
+        const years = await window.apiRequest("/admission-years")
+        const yearSelect = document.getElementById("admissionYear")
+        yearSelect.innerHTML = '<option value="">Select admission year</option>'
+        
+        years.forEach(year => {
+          const option = document.createElement("option")
+          option.value = year
+          option.textContent = year
+          yearSelect.appendChild(option)
+        })
+      } catch (error) {
+        console.error("Unable to load admission years:", error)
+      }
+    }
+
     async function loadStudents() {
       setAlert("")
       document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Loading students...</td></tr>'
@@ -379,6 +423,7 @@
       document.getElementById("studentSemester").innerHTML = '<option value="">Select a semester</option>'
       document.getElementById("studentPapers").innerHTML = '<p class="text-muted small">Please select a course and semester first</p>'
       document.querySelector('label[for="studentPapers"]').textContent = 'Papers (Select 1-4)'
+      document.getElementById("batchInfo").textContent = ''
       setSaveButtonState(false)
     }
 
@@ -403,6 +448,9 @@
       document.getElementById("studentPhone").value = student.phone || ""
       document.getElementById("admissionYear").value = student.admission_year || ""
       setSaveButtonState(false)
+      
+      // Display batch information
+      updateBatchDisplay()
       
       // Load semester options for this course
       updateSemesterOptions().then(() => {
@@ -435,7 +483,7 @@
         document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
       ).map(checkbox => Number(checkbox.value))
 
-      if (!name || !roll || !courseId || !semester || !email || !phone) {
+      if (!name || !roll || !courseId || !semester || !admissionYear || !email || !phone) {
         setAlert("Please fill in all required student fields.")
         return
       }
@@ -454,13 +502,10 @@
           roll,
           course_id: Number(courseId),
           semester: Number(semester),
+          admission_year: Number(admissionYear),
           papers: selectedPapers,
           email,
           phone,
-        }
-        // Only include admission_year if provided
-        if (admissionYear) {
-          payload.admission_year = Number(admissionYear)
         }
         const path = activeStudentId ? `/students/${activeStudentId}` : "/students"
         const method = activeStudentId ? "PUT" : "POST"
@@ -508,6 +553,7 @@
         window.saveStudent()
       })
       loadCourses()
+      loadAdmissionYears()
       loadStudents()
     })
   </script>

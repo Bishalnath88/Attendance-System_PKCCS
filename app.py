@@ -875,6 +875,18 @@ def get_papers(course_id, semester):
         close_db(conn, cursor, rollback=False)
 
 
+@app.route("/admission-years", methods=["GET"])
+@require_auth
+def get_admission_years():
+    # Get list of admission years for dropdown - GET /admission-years
+    current_year = datetime.now().year
+    # Generate years from 20 years ago to 2 years in future
+    years = list(range(current_year - 20, current_year + 3))
+    # Reverse to show newest first
+    years.reverse()
+    return jsonify(years)
+
+
 @app.route("/attendance", methods=["POST"])
 @require_auth
 def save_attendance():
