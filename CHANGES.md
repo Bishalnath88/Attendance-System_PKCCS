@@ -1,5 +1,24 @@
 # Student Management System - Recent Changes
 
+## Latest Update - Bug Fixes (April 15, 2026)
+
+### Issues Fixed
+1. **Database-Backend Mismatch**: Made `admission_year` field optional to maintain backward compatibility
+2. **Student Addition Failing**: Added error handling for missing database column
+3. **500 Error on Student Operations**: Now gracefully handles both old and new database schemas
+
+### Changes Made
+- ✅ Backend: admission_year defaults to current year if not provided
+- ✅ Backend: Added fallback for database column existence
+- ✅ Frontend: Made admission year field optional (not required)
+- ✅ Created: `migrate_db.py` script for safe database migration
+- ✅ Created: `FIX_GUIDE.md` with detailed troubleshooting
+
+### Migration
+Run `python migrate_db.py` to add missing `admission_year` column to production database
+
+---
+
 ## Overview
 The student management system has been updated to replace the simple "class" field with a more comprehensive course, semester, and papers system. Students can now select from multiple courses (BSc, BCA, Bvoc IT, Bvoc Food, etc.), choose a semester (1-8), and select 1-4 papers for each course/semester combination.
 
