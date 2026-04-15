@@ -334,8 +334,8 @@ def validate_student_payload(data):
     email = normalize_email(data.get("email"))
     phone = normalize_text(data.get("phone", ""))
 
-    if not all([name, roll, course_id, semester, admission_year, email, phone]):
-        return None, "All student fields (name, roll, course, semester, admission year, email, phone) are required."
+    if not all([name, roll, course_id, semester, email, phone]):
+        return None, "All student fields (name, roll, course, semester, email, phone) are required."
 
     if not is_valid_email(email):
         return None, "Please enter a valid student email address."
@@ -347,7 +347,11 @@ def validate_student_payload(data):
     try:
         course_id = int(course_id)
         semester = int(semester)
-        admission_year = int(admission_year)
+        # admission_year is optional - use current year as default if not provided
+        if admission_year:
+            admission_year = int(admission_year)
+        else:
+            admission_year = datetime.now().year
     except (TypeError, ValueError):
         return None, "Course ID, semester, and admission year must be valid numbers."
 
@@ -606,19 +610,39 @@ def add_student():
         if cursor.fetchone():
             return json_error("Roll number or email already exists.", 409)
 
-        cursor.execute(
-            "INSERT INTO students (name, roll, course_id, semester, admission_year, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-            (
-                student["name"],
-                student["roll"],
-                student["course_id"],
-                student["semester"],
-                student["admission_year"],
-                json.dumps(student["papers"]),
-                student["email"],
-                student["phone"],
-            ),
-        )
+        try:
+            # Try to insert with admission_year column
+            cursor.execute(
+                "INSERT INTO students (name, roll, course_id, semester, admission_year, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    student["name"],
+                    student["roll"],
+                    student["course_id"],
+                    student["semester"],
+                    student["admission_year"],
+                    json.dumps(student["papers"]),
+                    student["email"],
+                    student["phone"],
+                ),
+            )
+        except mysql.connector.Error as e:
+            # If admission_year column doesn't exist, insert without it (backward compatibility)
+            if "Unknown column" in str(e):
+                cursor.execute(
+                    "INSERT INTO students (name, roll, course_id, semester, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        student["name"],
+                        student["roll"],
+                        student["course_id"],
+                        student["semester"],
+                        json.dumps(student["papers"]),
+                        student["email"],
+                        student["phone"],
+                    ),
+                )
+            else:
+                raise
+        
         conn.commit()
 
         student_id = cursor.lastrowid
@@ -687,21 +711,41 @@ def update_student(student_id):
         if cursor.fetchone():
             return json_error("Roll number or email already belongs to another student.", 409)
 
-        # Update student record with new values
-        cursor.execute(
-            "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, admission_year = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
-            (
-                student["name"],
-                student["roll"],
-                student["course_id"],
-                student["semester"],
-                student["admission_year"],
-                json.dumps(student["papers"]),
-                student["email"],
-                student["phone"],
-                student_id,
-            ),
-        )
+        try:
+            # Update student record with new values
+            cursor.execute(
+                "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, admission_year = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
+                (
+                    student["name"],
+                    student["roll"],
+                    student["course_id"],
+                    student["semester"],
+                    student["admission_year"],
+                    json.dumps(student["papers"]),
+                    student["email"],
+                    student["phone"],
+                    student_id,
+                ),
+            )
+        except mysql.connector.Error as e:
+            # If admission_year column doesn't exist, update without it (backward compatibility)
+            if "Unknown column" in str(e):
+                cursor.execute(
+                    "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
+                    (
+                        student["name"],
+                        student["roll"],
+                        student["course_id"],
+                        student["semester"],
+                        json.dumps(student["papers"]),
+                        student["email"],
+                        student["phone"],
+                        student_id,
+                    ),
+                )
+            else:
+                raise
+        
         conn.commit()
 
         cursor.execute("SELECT * FROM students WHERE id = %s", (student_id,))

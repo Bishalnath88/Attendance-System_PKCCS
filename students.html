@@ -150,8 +150,8 @@
               </select>
             </div>
             <div class="mb-3">
-              <label for="admissionYear" class="form-label">Admission Year</label>
-              <input type="number" class="form-control" id="admissionYear" placeholder="Enter admission year (e.g., 2023)" min="2000" max="2100" required>
+              <label for="admissionYear" class="form-label">Admission Year (Optional)</label>
+              <input type="number" class="form-control" id="admissionYear" placeholder="Enter admission year (e.g., 2023) - defaults to current year" min="2000" max="2100">
             </div>
             <div class="mb-3">
               <label for="studentPapers" class="form-label">Papers (Select 1-4)</label>
@@ -435,8 +435,8 @@
         document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
       ).map(checkbox => Number(checkbox.value))
 
-      if (!name || !roll || !courseId || !semester || !admissionYear || !email || !phone) {
-        setAlert("Please fill in all student fields.")
+      if (!name || !roll || !courseId || !semester || !email || !phone) {
+        setAlert("Please fill in all required student fields.")
         return
       }
 
@@ -454,10 +454,13 @@
           roll,
           course_id: Number(courseId),
           semester: Number(semester),
-          admission_year: Number(admissionYear),
           papers: selectedPapers,
           email,
           phone,
+        }
+        // Only include admission_year if provided
+        if (admissionYear) {
+          payload.admission_year = Number(admissionYear)
         }
         const path = activeStudentId ? `/students/${activeStudentId}` : "/students"
         const method = activeStudentId ? "PUT" : "POST"
