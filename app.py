@@ -82,7 +82,7 @@ def get_db_config():
 
 
 def ensure_database_schema():
-    # Ensure database schema exists and passwords column is properly sized
+    # Ensure database schema exists and all required columns are properly configured
     global SCHEMA_BOOTSTRAPPED
 
     if SCHEMA_BOOTSTRAPPED:
@@ -111,6 +111,25 @@ def ensure_database_schema():
                 f"ALTER TABLE users MODIFY COLUMN password VARCHAR({PASSWORD_COLUMN_MIN_LENGTH})"
             )
             conn.commit()
+
+        # Check and add admission_year column if it doesn't exist
+        cursor.execute(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_NAME='students' AND COLUMN_NAME='admission_year'"
+        )
+        if not cursor.fetchone():
+            # Add admission_year column if missing
+            try:
+                cursor.execute(
+                    "ALTER TABLE students ADD COLUMN admission_year INT DEFAULT 2026 AFTER semester"
+                )
+                cursor.execute(
+                    "CREATE INDEX idx_admission_year ON students(admission_year)"
+                )
+                conn.commit()
+            except mysql.connector.Error as e:
+                if "Duplicate column name" not in str(e):
+                    pass  # Column might exist or other non-critical error
 
         SCHEMA_BOOTSTRAPPED = True
     except mysql.connector.Error:
