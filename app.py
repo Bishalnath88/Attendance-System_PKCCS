@@ -595,12 +595,24 @@ def me():
 @require_auth
 def get_students():
     # Get all students - retrieve complete student roster - GET /students
+    # Optional query parameter: admission_year (to filter by batch)
+    admission_year = request.args.get("admission_year", type=int)
+    
     conn = cursor = None
     try:
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
-        # Retrieve all students, sorted by name then by roll number
-        cursor.execute("SELECT * FROM students ORDER BY name ASC, roll ASC")
+        
+        if admission_year:
+            # Filter by admission year (batch)
+            cursor.execute(
+                "SELECT * FROM students WHERE admission_year = %s ORDER BY name ASC, roll ASC",
+                (admission_year,)
+            )
+        else:
+            # Retrieve all students, sorted by name then by roll number
+            cursor.execute("SELECT * FROM students ORDER BY name ASC, roll ASC")
+        
         # Serialize each row to handle datetime conversion and add batch info
         data = [add_batch_to_student(serialize_row(row)) for row in cursor.fetchall()]
         return jsonify(data)
@@ -923,6 +935,61 @@ def get_admission_years():
     # Reverse to show newest first
     years.reverse()
     return jsonify(years)
+
+
+@app.route("/batches", methods=["GET"])
+@require_auth
+def get_batches():
+    """Get all available batches (admission year + duration combos)
+    
+    Example: 2023-2027 (BSc 4-year), 2024-2027 (3-year)
+    """
+    conn = cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get all unique admission_year + course_id combinations that have students
+        cursor.execute("""
+            SELECT DISTINCT s.admission_year, c.id, c.name
+            FROM students s
+            JOIN courses c ON s.course_id = c.id
+            ORDER BY s.admission_year DESC
+        """)
+        records = cursor.fetchall()
+        
+        batches = []
+        seen = set()
+        
+        for record in records:
+            admission_year = record['admission_year']
+            course_id = record['id']
+            course_name = record['name']
+            
+            # Determine if BSc (4 years) or other (3 years)
+            is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
+            duration = 4 if is_bsc else 3
+            end_year = admission_year + duration
+            
+            batch_label = f"{admission_year}-{end_year}"
+            batch_key = (admission_year, end_year)
+            
+            # Avoid duplicates
+            if batch_key not in seen:
+                seen.add(batch_key)
+                batches.append({
+                    "batch": batch_label,
+                    "admission_year": admission_year,
+                    "end_year": end_year,
+                    "duration": duration
+                })
+        
+        return jsonify(batches)
+    except Exception as e:
+        print(f"Error fetching batches: {e}")
+        return jsonify([]), 500
+    finally:
+        close_db(conn, cursor)
 
 
 @app.route("/attendance", methods=["POST"])

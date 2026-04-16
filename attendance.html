@@ -88,6 +88,12 @@
         <div class="card-body">
           <div class="row gy-3">
             <div class="col-md-3">
+              <label for="attBatch" class="form-label">Batch</label>
+              <select class="form-select" id="attBatch" onchange="updateAttCourseOptions()">
+                <option value="">Select a batch</option>
+              </select>
+            </div>
+            <div class="col-md-3">
               <label for="attCourse" class="form-label">Course</label>
               <select class="form-select" id="attCourse" onchange="updateAttSemesterOptions()">
                 <option value="">Select a course</option>
@@ -168,7 +174,9 @@
   <script>
     let students = []
     let courses = []
+    let allBatches = []
     let allPapers = []
+    let selectedBatch = null
     let selectedCourseId = null
     let selectedSemester = null
     let selectedPaperId = null
@@ -230,12 +238,13 @@
 
       tableBody.innerHTML = list.map(student => {
         const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
+        const currentSemester = student.current_semester || student.semester || "N/A"
         return `
         <tr>
           <td>${window.escapeHtml(student.name)}</td>
           <td>${window.escapeHtml(student.roll)}</td>
           <td>${window.escapeHtml(courseName)}</td>
-          <td>${student.semester}</td>
+          <td><strong>${currentSemester}</strong></td>
           <td>
             <select class="form-select form-select-sm" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
               <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
@@ -348,7 +357,7 @@
       const paperSelect = document.getElementById("attPaper")
       selectedPaperId = paperSelect.value ? Number(paperSelect.value) : null
 
-      if (!selectedCourseId || !selectedSemester || !selectedPaperId) {
+      if (!selectedBatch || !selectedCourseId || !selectedSemester || !selectedPaperId) {
         students = []
         resetAttendanceState("absent")
         renderAttendanceTable(students)
@@ -359,7 +368,8 @@
       document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Loading students...</td></tr>'
 
       try {
-        const allStudents = await window.apiRequest("/students")
+        // Fetch students for this batch only
+        const allStudents = await window.apiRequest(`/students?admission_year=${selectedBatch}`)
         students = allStudents.filter(student => 
           student.course_id === selectedCourseId && 
           student.semester === selectedSemester &&
@@ -370,6 +380,70 @@
       } catch (error) {
         document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Unable to load students.</td></tr>'
         setAlert(error.message || "Unable to load students right now.")
+      }
+    }
+
+    async function loadBatches() {
+      try {
+        allBatches = await window.apiRequest("/batches")
+        const batchSelect = document.getElementById("attBatch")
+        batchSelect.innerHTML = '<option value="">Select a batch</option>'
+        
+        allBatches.forEach(batch => {
+          const option = document.createElement("option")
+          option.value = batch.admission_year
+          option.textContent = batch.batch
+          batchSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load batches.")
+      }
+    }
+
+    window.updateAttCourseOptions = async function() {
+      const batchSelect = document.getElementById("attBatch")
+      const courseSelect = document.getElementById("attCourse")
+      const semesterSelect = document.getElementById("attSemester")
+      const paperSelect = document.getElementById("attPaper")
+      
+      selectedBatch = batchSelect.value ? Number(batchSelect.value) : null
+      selectedCourseId = null
+      selectedSemester = null
+      selectedPaperId = null
+      
+      courseSelect.innerHTML = '<option value="">Select a course</option>'
+      semesterSelect.disabled = true
+      semesterSelect.innerHTML = '<option value="">Select a semester</option>'
+      paperSelect.disabled = true
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
+      
+      if (!selectedBatch) {
+        students = []
+        resetAttendanceState("absent")
+        renderAttendanceTable(students)
+        return
+      }
+
+      try {
+        // Load all courses
+        const allCourses = await window.apiRequest("/courses")
+        
+        // Get students for this batch to find which courses are offered
+        const batchStudents = await window.apiRequest(`/students?admission_year=${selectedBatch}`)
+        const offeredCourseIds = new Set(batchStudents.map(s => s.course_id))
+        
+        // Filter courses to only those offered in this batch
+        courses = allCourses.filter(c => offeredCourseIds.has(c.id))
+        
+        courseSelect.innerHTML = '<option value="">Select a course</option>'
+        courses.forEach(course => {
+          const option = document.createElement("option")
+          option.value = course.id
+          option.textContent = course.name
+          courseSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load courses for this batch.")
       }
     }
 
@@ -435,11 +509,13 @@
     }
 
     window.resetAttendance = function() {
+      document.getElementById("attBatch").selectedIndex = 0
       document.getElementById("attCourse").selectedIndex = 0
       document.getElementById("attSemester").selectedIndex = 0
       document.getElementById("attPaper").selectedIndex = 0
       document.getElementById("attendanceDate").value = window.getTodayLocalDate()
       document.getElementById("searchStudent").value = ""
+      selectedBatch = null
       selectedCourseId = null
       selectedSemester = null
       selectedPaperId = null
@@ -497,7 +573,7 @@
       window.setupSidebar()
       document.getElementById("attendanceDate").value = window.getTodayLocalDate()
       document.getElementById("searchStudent").addEventListener("input", applySearch)
-      loadCourses()
+      loadBatches()
     })
   </script>
 </body>
