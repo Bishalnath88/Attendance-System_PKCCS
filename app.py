@@ -625,7 +625,8 @@ def get_students():
         cursor = conn.cursor(dictionary=True)
         
         if admission_year:
-            # Fetch students with their courses for filtering by course end date
+            # Fetch students with their courses for the specified batch (admission year)
+            # Returns ALL students from that admission year regardless of course status
             cursor.execute("""
                 SELECT s.*, c.name as course_name
                 FROM students s
@@ -648,17 +649,22 @@ def get_students():
         for row in rows:
             student_dict = serialize_row(row)
             
-            # If batch is specified, filter out students whose course has ended
-            if admission_year:
-                course_name = row.get('course_name', '')
-                is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
-                duration = 4 if is_bsc else 3
-                
-                # Skip if course has ended
-                if has_course_ended(admission_year, duration):
-                    continue
-            
+            # Add batch info and calculate course status
             student_dict = add_batch_to_student(student_dict)
+            
+            # Add course duration and active status for attendance purposes
+            course_name = row.get('course_name', '')
+            is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
+            duration = 4 if is_bsc else 3
+            
+            # Calculate course end date and check if still active
+            course_end_date = get_course_end_date(admission_year, duration)
+            course_is_active = not has_course_ended(admission_year, duration)
+            
+            student_dict['course_end_date'] = course_end_date.isoformat()
+            student_dict['course_active'] = course_is_active
+            student_dict['course_duration'] = duration
+            
             data.append(student_dict)
         
         return jsonify(data)

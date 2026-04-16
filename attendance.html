@@ -238,19 +238,35 @@
       tableBody.innerHTML = list.map(student => {
         const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
         const currentSemester = student.current_semester || student.semester || "N/A"
+        const isActive = student.course_active !== false  // Default to true if not specified
+        const recordKey = `record_${Number(student.id)}`
+        
+        let statusHtml = ""
+        if (isActive) {
+          statusHtml = `
+            <select class="form-select form-select-sm" data-student-id="${Number(student.id)}" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
+              <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
+              <option value="late" ${(attendanceState[student.id] || "absent") === "late" ? "selected" : ""}>Late</option>
+              <option value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "selected" : ""}>Absent</option>
+            </select>`
+        } else {
+          const endDate = student.course_end_date ? window.formatDate(student.course_end_date) : "N/A"
+          statusHtml = `
+            <div class="d-flex gap-2 align-items-center">
+              <select class="form-select form-select-sm" disabled>
+                <option value="absent">Absent</option>
+              </select>
+              <span class="badge bg-secondary" title="Course ended on ${endDate}">Ended</span>
+            </div>`
+        }
+        
         return `
-        <tr>
+        <tr${isActive ? "" : " style='opacity: 0.6;'"}>
           <td>${window.escapeHtml(student.name)}</td>
           <td>${window.escapeHtml(student.roll)}</td>
           <td>${window.escapeHtml(courseName)}</td>
           <td><strong>${currentSemester}</strong></td>
-          <td>
-            <select class="form-select form-select-sm" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
-              <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
-              <option value="late" ${(attendanceState[student.id] || "absent") === "late" ? "selected" : ""}>Late</option>
-              <option value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "selected" : ""}>Absent</option>
-            </select>
-          </td>
+          <td>${statusHtml}</td>
         </tr>
       `
       }).join("")
@@ -539,11 +555,20 @@
         return
       }
 
+      // Filter to only include students with active courses
+      const activeStudents = students.filter(s => s.course_active !== false)
+      
+      if (!activeStudents.length) {
+        setAlert("No students with active courses available for attendance.", "warning")
+        return
+      }
+
       setAlert("")
       setSubmitState(true)
 
       try {
-        const records = students.map(student => ({
+        // Only submit attendance for students whose courses are still active
+        const records = activeStudents.map(student => ({
           student_id: Number(student.id),
           date,
           subject: paperName,
@@ -555,11 +580,15 @@
           body: records
         })
 
+        const skippedCount = students.length - activeStudents.length
+        let statusMessage = `${result.message || "Attendance saved."} Created: ${result.created || 0}, updated: ${result.updated || 0}.`
+        
+        if (skippedCount > 0) {
+          statusMessage += ` (Skipped ${skippedCount} student${skippedCount === 1 ? "" : "s"} with ended courses)`
+        }
+
         await loadExistingAttendance()
-        setAlert(
-          `${result.message || "Attendance saved."} Created: ${result.created || 0}, updated: ${result.updated || 0}.`,
-          "success"
-        )
+        setAlert(statusMessage, "success")
       } catch (error) {
         setAlert(error.message || "Unable to save attendance right now.")
       } finally {
