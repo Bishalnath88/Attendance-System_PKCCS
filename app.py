@@ -591,6 +591,27 @@ def me():
     return jsonify({"email": g.user_email})
 
 
+def get_course_end_date(admission_year, course_duration):
+    """Calculate course end date (July of final year)
+    
+    Academic year: Aug - Jul
+    Course end = admission_year + duration - 1, July 31st
+    
+    Example:
+    - Admitted Aug 2023, 4-year BSc: ends July 2027
+    - Admitted Aug 2023, 3-year other: ends July 2026
+    """
+    end_year = admission_year + course_duration - 1
+    return date(end_year, 7, 31)
+
+
+def has_course_ended(admission_year, course_duration):
+    """Check if a student's course has ended based on today's date"""
+    end_date = get_course_end_date(admission_year, course_duration)
+    today = date.today()
+    return today > end_date
+
+
 @app.route("/students", methods=["GET"])
 @require_auth
 def get_students():
@@ -604,17 +625,42 @@ def get_students():
         cursor = conn.cursor(dictionary=True)
         
         if admission_year:
-            # Filter by admission year (batch)
-            cursor.execute(
-                "SELECT * FROM students WHERE admission_year = %s ORDER BY name ASC, roll ASC",
-                (admission_year,)
-            )
+            # Fetch students with their courses for filtering by course end date
+            cursor.execute("""
+                SELECT s.*, c.name as course_name
+                FROM students s
+                JOIN courses c ON s.course_id = c.id
+                WHERE s.admission_year = %s
+                ORDER BY s.name ASC, s.roll ASC
+            """, (admission_year,))
         else:
             # Retrieve all students, sorted by name then by roll number
-            cursor.execute("SELECT * FROM students ORDER BY name ASC, roll ASC")
+            cursor.execute("""
+                SELECT s.*, c.name as course_name
+                FROM students s
+                JOIN courses c ON s.course_id = c.id
+                ORDER BY s.name ASC, s.roll ASC
+            """)
         
-        # Serialize each row to handle datetime conversion and add batch info
-        data = [add_batch_to_student(serialize_row(row)) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        data = []
+        
+        for row in rows:
+            student_dict = serialize_row(row)
+            
+            # If batch is specified, filter out students whose course has ended
+            if admission_year:
+                course_name = row.get('course_name', '')
+                is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
+                duration = 4 if is_bsc else 3
+                
+                # Skip if course has ended
+                if has_course_ended(admission_year, duration):
+                    continue
+            
+            student_dict = add_batch_to_student(student_dict)
+            data.append(student_dict)
+        
         return jsonify(data)
     except mysql.connector.Error:
         return json_error("Unable to load students right now.", 500)
@@ -940,21 +986,23 @@ def get_admission_years():
 @app.route("/batches", methods=["GET"])
 @require_auth
 def get_batches():
-    """Get all available batches (admission year + duration combos)
+    """Get all available batches using 4-year duration (BSc standard)
     
-    Example: 2023-2027 (BSc 4-year), 2024-2027 (3-year)
+    Returns only 4-year batch ranges: 2023-2027, 2024-2028, etc.
+    Each batch contains:
+    - BSc students: attendance until 4th year
+    - Other courses: attendance until 3rd year (then stop)
     """
     conn = cursor = None
     try:
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
         
-        # Get all unique admission_year + course_id combinations that have students
+        # Get all unique admission years that have students
         cursor.execute("""
-            SELECT DISTINCT s.admission_year, c.id, c.name
-            FROM students s
-            JOIN courses c ON s.course_id = c.id
-            ORDER BY s.admission_year DESC
+            SELECT DISTINCT admission_year
+            FROM students
+            ORDER BY admission_year DESC
         """)
         records = cursor.fetchall()
         
@@ -963,25 +1011,19 @@ def get_batches():
         
         for record in records:
             admission_year = record['admission_year']
-            course_id = record['id']
-            course_name = record['name']
             
-            # Determine if BSc (4 years) or other (3 years)
-            is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
-            duration = 4 if is_bsc else 3
-            end_year = admission_year + duration
-            
-            batch_label = f"{admission_year}-{end_year}"
+            # Calculate batch using 4-year duration (BSc standard)
+            end_year = admission_year + 4
             batch_key = (admission_year, end_year)
             
             # Avoid duplicates
             if batch_key not in seen:
                 seen.add(batch_key)
                 batches.append({
-                    "batch": batch_label,
+                    "batch": f"{admission_year}-{end_year}",
                     "admission_year": admission_year,
                     "end_year": end_year,
-                    "duration": duration
+                    "duration": 4
                 })
         
         return jsonify(batches)

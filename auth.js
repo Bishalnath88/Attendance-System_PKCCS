@@ -297,7 +297,57 @@ function escapeHtml(value) {
 }
 
 window.API_BASE_URL = API_BASE_URL;
-window.apiRequest = apiRequest;
+/**
+ * Custom Modal Handler - Replaces Bootstrap Modal
+ * Provides show/hide functionality for modals without Bootstrap
+ */
+class CustomModal {
+  constructor(elementId) {
+    this.modal = document.getElementById(elementId);
+    this.backdrop = this.createBackdrop();
+  }
+
+  createBackdrop() {
+    let backdrop = document.getElementById("modal-backdrop");
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = "modal-backdrop";
+      backdrop.className = "modal-backdrop";
+      backdrop.style.display = "none";
+      backdrop.style.position = "fixed";
+      backdrop.style.top = "0";
+      backdrop.style.left = "0";
+      backdrop.style.width = "100%";
+      backdrop.style.height = "100%";
+      backdrop.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+      backdrop.style.zIndex = "1999";
+      backdrop.addEventListener("click", () => this.hide());
+      document.body.appendChild(backdrop);
+    }
+    return backdrop;
+  }
+
+  show() {
+    this.modal.classList.add("show");
+    this.modal.style.display = "flex";
+    this.backdrop.style.display = "block";
+    document.body.style.overflow = "hidden";
+  }
+
+  hide() {
+    this.modal.classList.remove("show");
+    this.modal.style.display = "none";
+    this.backdrop.style.display = "none";
+    document.body.style.overflow = "auto";
+    // Reset form if exists
+    const form = this.modal.querySelector("form");
+    if (form) {
+      form.reset();
+    }
+  }
+}
+
+window.CustomModal = CustomModal;
 window.clearAuthSession = clearAuthSession;
 window.escapeHtml = escapeHtml;
 window.formatDate = formatDate;
