@@ -540,12 +540,14 @@ tbody tr:last-child td {
   z-index: 2000;
   background: rgba(0, 0, 0, 0.5);
   overflow: auto;
+  pointer-events: auto !important;
 }
 
 .modal-fade.show {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto !important;
 }
 
 .modal-dialog {
@@ -558,6 +560,8 @@ tbody tr:last-child td {
   display: block;
   margin: auto;
   overflow: visible;
+  pointer-events: auto !important;
+  z-index: 2001 !important;
 }
 
 .modal-header {
@@ -566,6 +570,7 @@ tbody tr:last-child td {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  pointer-events: auto !important;
 }
 
 .modal-title {
@@ -582,6 +587,7 @@ tbody tr:last-child td {
   color: #666;
   cursor: pointer;
   padding: 0;
+  pointer-events: auto !important;
 }
 
 .btn-close:hover {
@@ -592,6 +598,7 @@ tbody tr:last-child td {
   padding: 20px;
   overflow-y: auto;
   max-height: calc(90vh - 80px);
+  pointer-events: auto !important;
 }
 
 .modal-footer {
@@ -600,6 +607,7 @@ tbody tr:last-child td {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  pointer-events: auto !important;
 }
 
 
@@ -608,6 +616,7 @@ tbody tr:last-child td {
 .form-group {
   margin-bottom: 15px;
   display: block;
+  pointer-events: auto !important;
 }
 
 .form-label {
@@ -616,6 +625,7 @@ tbody tr:last-child td {
   margin-bottom: 5px;
   font-size: 0.95rem;
   color: #333;
+  pointer-events: auto !important;
 }
 
 .form-input {
@@ -631,6 +641,8 @@ tbody tr:last-child td {
   font-family: inherit !important;
   line-height: 1.4 !important;
   transition: border-color 0.2s ease !important;
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 .form-input:hover {
@@ -656,6 +668,7 @@ tbody tr:last-child td {
   font-family: inherit !important;
   line-height: 1.4 !important;
   cursor: pointer !important;
+  pointer-events: auto !important;
 }
 
 /* ========== SEARCH INPUT STYLING ========== */

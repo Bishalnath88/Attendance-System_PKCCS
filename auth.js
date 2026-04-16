@@ -304,40 +304,25 @@ window.API_BASE_URL = API_BASE_URL;
 class CustomModal {
   constructor(elementId) {
     this.modal = document.getElementById(elementId);
-    this.backdrop = this.createBackdrop();
-  }
-
-  createBackdrop() {
-    let backdrop = document.getElementById("modal-backdrop");
-    if (!backdrop) {
-      backdrop = document.createElement("div");
-      backdrop.id = "modal-backdrop";
-      backdrop.className = "modal-backdrop";
-      backdrop.style.display = "none";
-      backdrop.style.position = "fixed";
-      backdrop.style.top = "0";
-      backdrop.style.left = "0";
-      backdrop.style.width = "100%";
-      backdrop.style.height = "100%";
-      backdrop.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-      backdrop.style.zIndex = "1999";
-      backdrop.addEventListener("click", () => this.hide());
-      document.body.appendChild(backdrop);
+    if (!this.modal) {
+      console.error(`Modal with id ${elementId} not found`);
+      return;
     }
-    return backdrop;
   }
 
   show() {
+    if (!this.modal) return;
     this.modal.classList.add("show");
     this.modal.style.display = "flex";
-    this.backdrop.style.display = "block";
+    this.modal.style.pointerEvents = "auto";
     document.body.style.overflow = "hidden";
   }
 
   hide() {
+    if (!this.modal) return;
     this.modal.classList.remove("show");
     this.modal.style.display = "none";
-    this.backdrop.style.display = "none";
+    this.modal.style.pointerEvents = "none";
     document.body.style.overflow = "auto";
     // Reset form if exists
     const form = this.modal.querySelector("form");
