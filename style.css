@@ -381,9 +381,9 @@ thead th {
   font-weight: 700;
   color: #1f2937;
   border-bottom: 2px solid #4f46e5;
-  padding: 16px 14px;
+  padding: 12px 10px;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
@@ -397,10 +397,10 @@ tbody tr:hover {
 }
 
 tbody td {
-  padding: 14px 14px;
+  padding: 10px 10px;
   color: #475569;
   border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 tbody tr:last-child td {
@@ -467,7 +467,30 @@ tbody tr:last-child td {
 }
 
 .badge {
-  font-weight: 700;
+  font-weight: 600;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.badge-success {
+  background-color: #10b981;
+  color: white;
+}
+
+.badge-warning {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.badge-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.badge-light {
+  background-color: #f3f4f6;
+  color: #374151;
 }
 
 /* Hide elements completely - used for hidden alerts/content */
