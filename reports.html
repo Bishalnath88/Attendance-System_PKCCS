@@ -82,6 +82,12 @@
         <div class="card-body">
           <div class="row gy-3">
             <div class="col-md-3">
+              <label for="repBatch" class="form-label">Batch</label>
+              <select class="form-select" id="repBatch" onchange="updateRepCourseOptions()">
+                <option value="">Select a batch</option>
+              </select>
+            </div>
+            <div class="col-md-3">
               <label for="repCourse" class="form-label">Course</label>
               <select class="form-select" id="repCourse" onchange="updateRepSemesterOptions()">
                 <option value="">All Courses</option>
@@ -99,17 +105,17 @@
                 <option value="">All Papers</option>
               </select>
             </div>
+          </div>
+          <div class="row gy-3 mt-2">
             <div class="col-md-3">
               <label for="startDate" class="form-label">Start Date</label>
               <input type="date" class="form-control" id="startDate">
             </div>
-          </div>
-          <div class="row gy-3 mt-2">
             <div class="col-md-3">
               <label for="endDate" class="form-label">End Date</label>
               <input type="date" class="form-control" id="endDate">
             </div>
-            <div class="col-md-9"></div>
+            <div class="col-md-6"></div>
           </div>
           <div class="row mt-3 g-3">
             <div class="col-12 col-sm-6">
@@ -205,10 +211,12 @@
   <script>
     let students = []
     let courses = []
+    let allBatches = []
     let allPapers = []
     let allAttendanceRecords = []
     let reportData = []
     let attendanceChart = null
+    let selectedBatch = null
     let selectedCourseId = null
     let selectedSemester = null
     let selectedPaperId = null
@@ -247,6 +255,67 @@
     function calculateAttendancePercentage(present, late, totalDays) {
       const attendedDays = present + late
       return totalDays > 0 ? Math.round((attendedDays / totalDays) * 100) : 0
+    }
+
+    async function loadBatches() {
+      try {
+        allBatches = await window.apiRequest("/batches")
+        const batchSelect = document.getElementById("repBatch")
+        batchSelect.innerHTML = '<option value="">Select a batch</option>'
+        
+        allBatches.forEach(batch => {
+          const option = document.createElement("option")
+          option.value = batch.admission_year
+          option.textContent = batch.batch
+          batchSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load batches.")
+      }
+    }
+
+    window.updateRepCourseOptions = async function() {
+      const batchSelect = document.getElementById("repBatch")
+      const courseSelect = document.getElementById("repCourse")
+      const semesterSelect = document.getElementById("repSemester")
+      const paperSelect = document.getElementById("repPaper")
+      
+      selectedBatch = batchSelect.value ? Number(batchSelect.value) : null
+      selectedCourseId = null
+      selectedSemester = null
+      selectedPaperId = null
+      
+      courseSelect.innerHTML = '<option value="">All Courses</option>'
+      semesterSelect.disabled = true
+      semesterSelect.innerHTML = '<option value="">All Semesters</option>'
+      paperSelect.disabled = true
+      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      
+      if (!selectedBatch) {
+        return
+      }
+
+      try {
+        // Load all courses
+        const allCourses = await window.apiRequest("/courses")
+        
+        // Get students for this batch to find which courses are offered
+        const batchStudents = await window.apiRequest(`/students?admission_year=${selectedBatch}`)
+        const offeredCourseIds = new Set(batchStudents.map(s => s.course_id))
+        
+        // Filter courses to only those offered in this batch
+        courses = allCourses.filter(c => offeredCourseIds.has(c.id))
+        
+        courseSelect.innerHTML = '<option value="">All Courses</option>'
+        courses.forEach(course => {
+          const option = document.createElement("option")
+          option.value = course.id
+          option.textContent = course.name
+          courseSelect.appendChild(option)
+        })
+      } catch (error) {
+        setAlert("Unable to load courses for this batch.")
+      }
     }
 
     window.updateRepSemesterOptions = async function() {
@@ -447,6 +516,7 @@
 
     window.resetFilters = function() {
       const range = getDefaultDateRange()
+      document.getElementById("repBatch").selectedIndex = 0
       document.getElementById("repCourse").selectedIndex = 0
       document.getElementById("repSemester").selectedIndex = 0
       document.getElementById("repPaper").selectedIndex = 0
@@ -454,6 +524,7 @@
       document.getElementById("endDate").value = range.end
       document.getElementById("repSemester").disabled = true
       document.getElementById("repPaper").disabled = true
+      selectedBatch = null
       selectedCourseId = null
       selectedSemester = null
       selectedPaperId = null
@@ -496,6 +567,11 @@
         })
 
         let filteredStudents = students
+        
+        // Filter by batch if selected
+        if (selectedBatch) {
+          filteredStudents = filteredStudents.filter(s => s.admission_year === selectedBatch)
+        }
         
         // Filter by course if selected
         if (selectedCourseId) {
@@ -603,6 +679,7 @@
       window.populateUserInfo()
       window.setupSidebar()
       resetFilters()
+      await loadBatches()
       await loadInitialData()
     })
   </script>
