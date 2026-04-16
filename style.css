@@ -553,12 +553,14 @@ tbody tr:last-child td {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   max-width: 550px;
   width: 100%;
+  height: auto;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   border: none;
   position: relative;
   z-index: 2001;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -602,6 +604,8 @@ tbody tr:last-child td {
   padding: 24px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+  max-height: calc(90vh - 150px);
 }
 
 .modal-footer {
