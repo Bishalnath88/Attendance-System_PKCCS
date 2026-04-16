@@ -239,12 +239,13 @@
       tableBody.innerHTML = recentRecords.map(record => {
         const student = studentsById.get(record.student_id) || {}
         const courseName = coursesById.get(student.course_id)?.name || "Unknown"
+        const currentSemester = student.current_semester || student.semester || "-"
         return `
           <tr>
             <td>${window.escapeHtml(student.name || "Unknown Student")}</td>
             <td>${window.escapeHtml(student.roll || "-")}</td>
             <td>${window.escapeHtml(courseName)}</td>
-            <td>${student.semester || "-"}</td>
+            <td><strong>${currentSemester}</strong></td>
             <td>${window.escapeHtml(record.subject || "-")}</td>
             <td>${window.escapeHtml(window.formatDate(record.date))}</td>
             <td>${buildStatusBadge(record.status)}</td>

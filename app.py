@@ -176,7 +176,7 @@ def serialize_row(row):
 
 
 def add_batch_to_student(student):
-    """Add batch information to a student record"""
+    """Add batch information and current semester to a student record"""
     conn = cursor = None
     try:
         if 'admission_year' not in student:
@@ -198,11 +198,48 @@ def add_batch_to_student(student):
         end_year = admission_year + duration
         student['batch'] = f"{admission_year}-{end_year}"
         
+        # Add current semester (auto-calculated based on admission year)
+        student['current_semester'] = calculate_current_semester(admission_year)
+        
         return student
     except:
         return student
     finally:
         close_db(conn, cursor)
+
+
+def calculate_current_semester(admission_year):
+    """Calculate current semester based on admission year and today's date
+    
+    Academic year: August - July (2 semesters per year)
+    - Sem 1: Aug-Dec (Year 1)
+    - Sem 2: Jan-Jul (Year 1)
+    - Sem 3: Aug-Dec (Year 2)
+    - Sem 4: Jan-Jul (Year 2)
+    - etc.
+    
+    Returns: Current semester number
+    """
+    today = date.today()
+    current_year = today.year
+    current_month = today.month
+    
+    # Determine which academic year we're in
+    if current_month < 8:  # Jan-Jul: same academic year as last August
+        academic_year_start = current_year - 1
+    else:  # Aug-Dec: current academic year
+        academic_year_start = current_year
+    
+    # How many years since admission?
+    years_since_admission = academic_year_start - admission_year
+    
+    # Within this academic year, are we in first half (Aug-Dec) or second half (Jan-Jul)?
+    if current_month < 8:  # Jan-Jul = even semester (2, 4, 6, 8...)
+        semester = years_since_admission * 2 + 2
+    else:  # Aug-Dec = odd semester (1, 3, 5, 7...)
+        semester = years_since_admission * 2 + 1
+    
+    return max(1, semester)  # Ensure at least semester 1
 
 
 # ========== DATA VALIDATION FUNCTIONS ==========

@@ -230,12 +230,13 @@
       tableBody.innerHTML = list.map(student => {
         const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
         const batch = student.batch || "N/A"
+        const currentSemester = student.current_semester || student.semester || "N/A"
         return `
           <tr>
             <td>${window.escapeHtml(student.name)}</td>
             <td>${window.escapeHtml(student.roll)}</td>
             <td>${window.escapeHtml(courseName)}</td>
-            <td>${student.semester}</td>
+            <td><strong>${currentSemester}</strong></td>
             <td><span class="badge bg-info">${window.escapeHtml(batch)}</span></td>
             <td>${window.escapeHtml(student.email)}</td>
             <td>${window.escapeHtml(student.phone || "-")}</td>
