@@ -45,7 +45,7 @@
           <i class="fas fa-bars"></i>
         </button>
         <!-- Current page title -->
-        <h5>Students</h5>
+        <h5 class="mb-0">Students</h5>
       </div>
       <!-- Right side of navbar with user info and logout -->
       <div class="navbar-right">
@@ -57,7 +57,7 @@
           <span id="userName">Admin</span>
         </div>
         <!-- Logout button -->
-        <button class="btn btn-outline-danger logout-btn" onclick="logout()">
+        <button class="btn btn-outline-danger btn-sm logout-btn" onclick="logout()">
           <i class="fas fa-sign-out-alt"></i> Logout
         </button>
       </div>
@@ -71,22 +71,22 @@
         <p>Add, update, search, and remove students from a single place.</p>
       </div>
 
-      <div id="studentAlert" class="alert alert-danger d-none" role="alert"></div>
+      <div id="studentAlert" class="alert alert-danger hidden" role="alert"></div>
 
       <div class="card">
-        <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+        <div class="card-header card-header-flex d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
           <div>
             <h5>All Students</h5>
             <p class="margin-0 text-muted">Keep your student roster clean and up to date.</p>
           </div>
           <button class="btn btn-primary" onclick="openAddStudent()">
-            <i class="fas fa-plus me-2"></i>Add Student
+            <i class="fas fa-plus spacing-right"></i>Add Student
           </button>
         </div>
         <div class="card-body">
-          <div class="row align-items-center mb-4 gy-3">
+          <div class="row align-items-center margin-bottom-4 gy-3">
             <div class="col-md-7">
-              <input type="text" class="form-control" id="searchInput" placeholder="Search by name, roll number, course, or email">
+              <input type="text" class="form-input" id="searchInput" placeholder="Search by name, roll number, course, or email">
             </div>
             <div class="col-md-5 text-md-end">
               <span class="text-muted" id="studentCountLabel">Showing 0 students</span>
@@ -94,7 +94,7 @@
           </div>
           <div class="table-responsive">
             <table class="table table-hover">
-              <thead class="table-header">
+              <thead class="table-light">
                 <tr>
                   <th>Name</th>
                   <th>Roll No</th>
@@ -156,7 +156,7 @@
           <div class="form-group">
             <label for="studentPapers" class="form-label">Papers (Select 1-4)</label>
             <div id="studentPapers" class="border rounded padding-3 overflow-y-auto" style="max-height: 200px;">
-              <p class=\"text-muted\">Please select a course and semester first</p>
+              <p class="text-muted small margin-0">Please select a course and semester first</p>
             </div>
           </div>
           <div class="form-group">
@@ -172,7 +172,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="studentModal.hide()">Cancel</button>
         <button type="button" class="btn btn-primary" id="saveStudentBtn" onclick="saveStudent()">
-          <i class=\"fas fa-save\"></i> Save Student
+          <i class="fas fa-save spacing-right"></i>Save Student
         </button>
       </div>
     </div>
@@ -202,8 +202,8 @@
       const button = document.getElementById("saveStudentBtn")
       button.disabled = isSaving
       button.innerHTML = isSaving
-        ? '<i class=\"fas fa-spinner fa-spin\"></i> Saving...'
-        : `<i class=\"fas fa-save\"></i> ${activeStudentId ? "Update Student" : "Save Student"}`
+        ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...'
+        : `<i class="fas fa-save me-2"></i>${activeStudentId ? "Update Student" : "Save Student"}`
     }
 
     function renderStudents(list = students) {
@@ -217,8 +217,8 @@
       if (list.length === 0) {
         const searchQuery = document.getElementById("searchInput").value.trim()
         tableBody.innerHTML = searchQuery
-          ? '<tr><td colspan="8" class="text-center text-muted">No students match your search.</td></tr>'
-          : '<tr><td colspan="8" class="text-center text-muted">No students added yet. Click Add Student to begin.</td></tr>'
+          ? '<tr><td colspan="7" class="text-center py-5 text-muted">No students match your search.</td></tr>'
+          : '<tr><td colspan="7" class="text-center py-5 text-muted">No students added yet. Click Add Student to begin.</td></tr>'
         return
       }
 
@@ -232,14 +232,14 @@
             <td>${window.escapeHtml(student.roll)}</td>
             <td>${window.escapeHtml(courseName)}</td>
             <td><strong>${currentSemester}</strong></td>
-            <td><span class="badge">${window.escapeHtml(batch)}</span></td>
+            <td><span class="badge bg-info">${window.escapeHtml(batch)}</span></td>
             <td>${window.escapeHtml(student.email)}</td>
             <td>${window.escapeHtml(student.phone || "-")}</td>
             <td class="text-center">
-              <button class="btn btn-sm btn-outline-primary" onclick="openEditStudent(${Number(student.id)})" title="Edit ${window.escapeHtml(student.name)}">
+              <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent(${Number(student.id)})" aria-label="Edit ${window.escapeHtml(student.name)}">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${Number(student.id)})" title="Delete ${window.escapeHtml(student.name)}">
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${Number(student.id)})" aria-label="Delete ${window.escapeHtml(student.name)}">
                 <i class="fas fa-trash"></i>
               </button>
             </td>
@@ -320,16 +320,16 @@
         }
 
         papersContainer.innerHTML = activePapersOptions.map(paper => `
-          <div class="checkbox-group">
-            <input type="checkbox" value="${paper.id}" id="paper_${paper.id}" onchange="updatePaperCount()">
-            <label for="paper_${paper.id}">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" value="${paper.id}" id="paper_${paper.id}" onchange="updatePaperCount()">
+            <label class="form-check-label" for="paper_${paper.id}">
               ${window.escapeHtml(paper.name)}
-              ${paper.code ? `<span class="text-muted">(${paper.code})</span>` : ""}
+              ${paper.code ? `<span class="text-muted small">(${paper.code})</span>` : ""}
             </label>
           </div>
         `).join("")
       } catch (error) {
-        papersContainer.innerHTML = '<p class="text-danger">Unable to load papers for this course and semester.</p>'
+        papersContainer.innerHTML = '<p class="text-danger small">Unable to load papers for this course and semester.</p>'
       }
     }
 
@@ -384,13 +384,13 @@
 
     async function loadStudents() {
       setAlert("")
-      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center text-muted">Loading students...</td></tr>'
+      document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Loading students...</td></tr>'
 
       try {
         students = await window.apiRequest("/students")
         applySearch()
       } catch (error) {
-        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center text-muted">Unable to load students right now.</td></tr>'
+        document.getElementById("studentsTable").innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Unable to load students right now.</td></tr>'
         setAlert(error.message || "Unable to load students right now.")
       }
     }
