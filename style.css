@@ -743,6 +743,81 @@ tbody tr:last-child td {
   margin-top: 20px !important;
 }
 
+/* ========== ATTENDANCE FORM STYLING ========== */
+.card-body .row.gy-3 {
+  margin-bottom: 24px !important;
+  padding-bottom: 20px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.card-body .row.mt-3 {
+  margin-top: 16px !important;
+}
+
+#attBatch,
+#attCourse,
+#attSemester,
+#attPaper,
+#attendanceDate {
+  border: 1px solid #ddd !important;
+  border-radius: 8px !important;
+  padding: 10px 12px !important;
+  background-color: #fafafa !important;
+  color: #333 !important;
+  font-size: 0.95rem !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease !important;
+}
+
+#attBatch:hover,
+#attCourse:hover,
+#attSemester:hover,
+#attPaper:hover,
+#attendanceDate:hover {
+  background-color: white !important;
+  border-color: #bbb !important;
+}
+
+#attBatch:focus,
+#attCourse:focus,
+#attSemester:focus,
+#attPaper:focus,
+#attendanceDate:focus {
+  outline: none !important;
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15) !important;
+  background-color: white !important;
+}
+
+/* Attendance search bar */
+#searchStudent {
+  border: 2px solid #ddd !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  background-color: white !important;
+  color: #333 !important;
+  font-size: 0.95rem !important;
+}
+
+#searchStudent:hover {
+  border-color: #bbb !important;
+  background-color: #fafafa !important;
+}
+
+#searchStudent:focus {
+  outline: none !important;
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15) !important;
+  background-color: white !important;
+}
+
+#studentCount {
+  display: block !important;
+  font-size: 0.95rem !important;
+  color: #666 !important;
+  padding-top: 4px !important;
+  text-align: right !important;
+}
+
 /* ========== CHECKBOX STYLING ========== */
 input[type="checkbox"],
 .form-check-input[type="checkbox"] {
