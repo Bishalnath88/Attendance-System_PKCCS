@@ -185,6 +185,9 @@
     let activePapersOptions = []
     let activeStudentId = null
     let studentModal
+
+    function setAlert(message = "", type = "danger") {
+      const alertBox = document.getElementById("studentAlert")
       if (!message) {
         alertBox.textContent = ""
         alertBox.className = "alert alert-danger d-none"
