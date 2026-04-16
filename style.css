@@ -379,25 +379,28 @@ thead {
 
 thead th {
   font-weight: 700;
-  color: #334155;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.95);
-  padding: 18px 20px;
+  color: #1f2937;
+  border-bottom: 2px solid #4f46e5;
+  padding: 16px 14px;
   text-align: left;
+  font-size: 0.9rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 tbody tr {
-  transition: background-color 0.25s ease, transform 0.25s ease;
+  transition: background-color 0.2s ease;
 }
 
 tbody tr:hover {
-  background-color: #f8fbff;
-  transform: translateX(4px);
+  background-color: #f0f4ff;
 }
 
 tbody td {
-  padding: 18px 20px;
+  padding: 14px 14px;
   color: #475569;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  font-size: 0.95rem;
 }
 
 tbody tr:last-child td {
