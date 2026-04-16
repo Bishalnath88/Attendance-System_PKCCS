@@ -614,7 +614,7 @@ tbody tr:last-child td {
 
 /* ========== FORM STYLING ========== */
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
   display: block;
   pointer-events: auto !important;
 }
@@ -622,53 +622,74 @@ tbody tr:last-child td {
 .form-label {
   display: block;
   font-weight: 600;
-  margin-bottom: 5px;
-  font-size: 0.95rem;
-  color: #333;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: #222;
   pointer-events: auto !important;
 }
 
 .form-input {
   width: 100% !important;
-  padding: 8px 10px !important;
-  border: 1px solid #ccc !important;
-  border-radius: 6px !important;
+  padding: 9px 11px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 5px !important;
   font-size: 0.95rem !important;
-  background-color: white !important;
+  background-color: #fafafa !important;
   color: #333 !important;
   box-sizing: border-box !important;
   display: block !important;
   font-family: inherit !important;
-  line-height: 1.4 !important;
-  transition: border-color 0.2s ease !important;
+  line-height: 1.5 !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease !important;
   pointer-events: auto !important;
   cursor: text !important;
 }
 
 .form-input:hover {
-  border-color: #999 !important;
+  background-color: #fff !important;
+  border-color: #bbb !important;
 }
 
 .form-input:focus {
   outline: none !important;
+  background-color: #fff !important;
   border-color: #0d6efd !important;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15) !important;
 }
 
 .form-select {
   width: 100% !important;
-  padding: 8px 10px !important;
-  border: 1px solid #ccc !important;
-  border-radius: 6px !important;
+  padding: 9px 11px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 5px !important;
   font-size: 0.95rem !important;
-  background-color: white !important;
+  background-color: #fafafa !important;
   color: #333 !important;
   box-sizing: border-box !important;
   display: block !important;
   font-family: inherit !important;
-  line-height: 1.4 !important;
+  line-height: 1.5 !important;
   cursor: pointer !important;
   pointer-events: auto !important;
+  transition: border-color 0.2s ease, background-color 0.2s ease !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px 12px !important;
+  padding-right: 2.5rem !important;
+}
+
+.form-select:hover {
+  background-color: #fff !important;
+  border-color: #bbb !important;
+}
+
+.form-select:focus {
+  outline: none !important;
+  background-color: #fff !important;
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15) !important;
 }
 
 /* ========== SEARCH INPUT STYLING ========== */
