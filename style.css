@@ -694,15 +694,42 @@ tbody tr:last-child td {
 
 /* ========== SEARCH INPUT STYLING ========== */
 #searchInput {
-  border: 2px solid rgba(148, 163, 184, 0.3);
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  background-color: white;
+  width: 100% !important;
+  padding: 10px 14px !important;
+  border: 2px solid #ddd !important;
+  border-radius: 8px !important;
+  font-size: 0.95rem !important;
+  background-color: white !important;
+  color: #333 !important;
+  transition: border-color 0.2s ease !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  font-family: inherit !important;
+  line-height: 1.5 !important;
+}
+
+#searchInput:hover {
+  border-color: #bbb !important;
+  background-color: #fafafa !important;
 }
 
 #searchInput:focus {
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  outline: none !important;
+  border-color: #0d6efd !important;
+  background-color: white !important;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15) !important;
+}
+
+#searchInput::placeholder {
+  color: #999 !important;
+}
+
+#studentCountLabel {
+  display: block !important;
+  font-size: 0.95rem !important;
+  color: #666 !important;
+  text-align: right !important;
+  padding-top: 2px !important;
 }
 
 /* ========== CHECKBOX STYLING ========== */
