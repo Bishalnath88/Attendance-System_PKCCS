@@ -199,7 +199,7 @@ def add_batch_to_student(student):
         student['batch'] = f"{admission_year}-{end_year}"
         
         # Add current semester (auto-calculated based on admission year and course type)
-        student['current_semester'] = calculate_current_semester(admission_year, course_id)
+        student['current_semester'] = calculate_current_semester(admission_year, is_bsc)
         
         return student
     except:
@@ -208,8 +208,8 @@ def add_batch_to_student(student):
         close_db(conn, cursor)
 
 
-def calculate_current_semester(admission_year, course_id=None):
-    """Calculate current semester based on admission year and today's date
+def calculate_current_semester(admission_year, is_bsc=False):
+    """Calculate current semester based on admission year and course type
     
     Academic Calendar (Aug-Jul batches):
     - Year 1: Sem 1 + 2 (Aug-Jul)
@@ -221,7 +221,7 @@ def calculate_current_semester(admission_year, course_id=None):
     - BSc: 8 semesters (4 years)
     - Other: 6 semesters (3 years)
     
-    Returns: Current semester number (capped at max)
+    Returns: Current semester number (capped at max for course type)
     """
     today = date.today()
     current_year = today.year
@@ -243,19 +243,7 @@ def calculate_current_semester(admission_year, course_id=None):
         semester = years_since_admission * 2 + 1
     
     # Cap at max semesters based on course type
-    max_semester = 8  # Default to 8 (BSc max)
-    if course_id:
-        try:
-            conn = get_db()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
-            course = cursor.fetchone()
-            is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
-            max_semester = 8 if is_bsc else 6
-            close_db(conn, cursor)
-        except:
-            pass
-    
+    max_semester = 8 if is_bsc else 6
     semester = min(semester, max_semester)
     
     return max(1, semester)  # Ensure at least semester 1
@@ -427,25 +415,10 @@ def validate_student_payload(data):
     if admission_year < current_year - 20 or admission_year > current_year + 2:
         return None, f"Admission year must be between {current_year - 20} and {current_year + 2}."
 
-    # Get course type to determine max semesters
-    # BSc: 8 semesters (4 years × 2 sems/year)
-    # Other: 6 semesters (3 years × 2 sems/year)
-    conn = cursor = None
-    try:
-        conn = get_db()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
-        course = cursor.fetchone()
-        is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
-    except:
-        is_bsc = False
-    finally:
-        close_db(conn, cursor)
-    
-    max_semester = 8 if is_bsc else 6
-    if semester < 1 or semester > max_semester:
-        course_type = "BSc" if is_bsc else "other courses"
-        return None, f"Semester must be between 1 and {max_semester} for {course_type}."
+    # Validate semester is in reasonable range (1-8 for any course)
+    # Actual validation happens in endpoint when checking against course_semesters table
+    if semester < 1 or semester > 8:
+        return None, "Semester must be between 1 and 8."
 
     if not isinstance(papers, list) or len(papers) < 1 or len(papers) > 4:
         return None, "You must select between 1 and 4 papers."
