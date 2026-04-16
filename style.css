@@ -707,39 +707,40 @@ tbody tr:last-child td {
 
 /* ========== CHECKBOX STYLING ========== */
 input[type="checkbox"] {
-  margin-right: 8px !important;
-  cursor: pointer !important;
+  display: inline-block !important;
   width: auto !important;
   height: auto !important;
-  accent-color: #0d6efd !important;
-  display: inline-block !important;
   vertical-align: middle !important;
+  margin: 0 8px 0 0 !important;
+  cursor: pointer !important;
+  accent-color: #0d6efd !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .form-check {
-  display: flex !important;
-  align-items: center !important;
-  margin-bottom: 10px !important;
+  display: block !important;
+  margin-bottom: 8px !important;
   padding: 0 !important;
 }
 
 .form-check-input {
+  display: inline-block !important;
   width: auto !important;
   height: auto !important;
-  margin-right: 8px !important;
-  margin-top: 0 !important;
+  margin: 0 8px 0 0 !important;
   cursor: pointer !important;
-  flex-shrink: 0 !important;
   accent-color: #0d6efd !important;
-  display: inline-block !important;
+  vertical-align: middle !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .form-check-label {
+  display: inline !important;
   margin: 0 !important;
-  margin-bottom: 0 !important;
   font-weight: 400 !important;
   cursor: pointer !important;
-  display: inline !important;
   user-select: none !important;
 }
 
@@ -752,12 +753,22 @@ input[type="checkbox"] {
 }
 
 #studentPapers .form-check {
-  margin-bottom: 8px !important;
+  margin-bottom: 10px !important;
 }
 
 #studentPapers .form-check:last-child {
   margin-bottom: 0 !important;
 }
+
+#studentPapers input,
+#studentPapers input[type="checkbox"] {
+  display: inline-block !important;
+  width: auto !important;
+  height: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
 
 
 @media (max-width: 768px) {
