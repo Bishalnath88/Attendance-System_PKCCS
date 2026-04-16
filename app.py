@@ -198,8 +198,8 @@ def add_batch_to_student(student):
         end_year = admission_year + duration
         student['batch'] = f"{admission_year}-{end_year}"
         
-        # Add current semester (auto-calculated based on admission year)
-        student['current_semester'] = calculate_current_semester(admission_year)
+        # Add current semester (auto-calculated based on admission year and course type)
+        student['current_semester'] = calculate_current_semester(admission_year, course_id)
         
         return student
     except:
@@ -208,17 +208,20 @@ def add_batch_to_student(student):
         close_db(conn, cursor)
 
 
-def calculate_current_semester(admission_year):
+def calculate_current_semester(admission_year, course_id=None):
     """Calculate current semester based on admission year and today's date
     
-    Academic year: August - July (2 semesters per year)
-    - Sem 1: Aug-Dec (Year 1)
-    - Sem 2: Jan-Jul (Year 1)
-    - Sem 3: Aug-Dec (Year 2)
-    - Sem 4: Jan-Jul (Year 2)
-    - etc.
+    Academic Calendar (Aug-Jul batches):
+    - Year 1: Sem 1 + 2 (Aug-Jul)
+    - Year 2: Sem 3 + 4 (Aug-Jul)
+    - Year 3: Sem 5 + 6 (Aug-Jul)
+    - Year 4 (BSc only): Sem 7 + 8 (Aug-Jul)
     
-    Returns: Current semester number
+    Total Semesters:
+    - BSc: 8 semesters (4 years)
+    - Other: 6 semesters (3 years)
+    
+    Returns: Current semester number (capped at max)
     """
     today = date.today()
     current_year = today.year
@@ -233,11 +236,27 @@ def calculate_current_semester(admission_year):
     # How many years since admission?
     years_since_admission = academic_year_start - admission_year
     
-    # Within this academic year, are we in first half (Aug-Dec) or second half (Jan-Jul)?
+    # Calculate current semester
     if current_month < 8:  # Jan-Jul = even semester (2, 4, 6, 8...)
         semester = years_since_admission * 2 + 2
     else:  # Aug-Dec = odd semester (1, 3, 5, 7...)
         semester = years_since_admission * 2 + 1
+    
+    # Cap at max semesters based on course type
+    max_semester = 8  # Default to 8 (BSc max)
+    if course_id:
+        try:
+            conn = get_db()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
+            course = cursor.fetchone()
+            is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
+            max_semester = 8 if is_bsc else 6
+            close_db(conn, cursor)
+        except:
+            pass
+    
+    semester = min(semester, max_semester)
     
     return max(1, semester)  # Ensure at least semester 1
 
@@ -408,8 +427,25 @@ def validate_student_payload(data):
     if admission_year < current_year - 20 or admission_year > current_year + 2:
         return None, f"Admission year must be between {current_year - 20} and {current_year + 2}."
 
-    if semester < 1 or semester > 8:
-        return None, "Semester must be between 1 and 8."
+    # Get course type to determine max semesters
+    # BSc: 8 semesters (4 years × 2 sems/year)
+    # Other: 6 semesters (3 years × 2 sems/year)
+    conn = cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
+        course = cursor.fetchone()
+        is_bsc = course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', ''))
+    except:
+        is_bsc = False
+    finally:
+        close_db(conn, cursor)
+    
+    max_semester = 8 if is_bsc else 6
+    if semester < 1 or semester > max_semester:
+        course_type = "BSc" if is_bsc else "other courses"
+        return None, f"Semester must be between 1 and {max_semester} for {course_type}."
 
     if not isinstance(papers, list) or len(papers) < 1 or len(papers) > 4:
         return None, "You must select between 1 and 4 papers."
@@ -594,14 +630,18 @@ def me():
 def get_course_end_date(admission_year, course_duration):
     """Calculate course end date (July of final year)
     
-    Academic year: Aug - Jul
-    Course end = admission_year + duration - 1, July 31st
+    Academic Calendar:
+    - Batch starts: August (mid-year)
+    - Batch ends: July (mid-year)
+    - 2 semesters per year = 1 academic year
+    
+    Course end = admission_year + duration, July 31st
     
     Example:
-    - Admitted Aug 2023, 4-year BSc: ends July 2027
-    - Admitted Aug 2023, 3-year other: ends July 2026
+    - Admitted Aug 2023, 4-year BSc: 2023 + 4 = ends July 2027
+    - Admitted Aug 2023, 3-year other: 2023 + 3 = ends July 2026
     """
-    end_year = admission_year + course_duration - 1
+    end_year = admission_year + course_duration
     return date(end_year, 7, 31)
 
 
