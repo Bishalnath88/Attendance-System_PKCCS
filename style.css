@@ -705,6 +705,60 @@ tbody tr:last-child td {
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
 }
 
+/* ========== CHECKBOX STYLING ========== */
+input[type="checkbox"] {
+  margin-right: 8px !important;
+  cursor: pointer !important;
+  vertical-align: middle !important;
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: #0d6efd !important;
+}
+
+.form-check {
+  display: flex !important;
+  align-items: center !important;
+  margin-bottom: 8px !important;
+  padding: 0 !important;
+}
+
+.form-check-input {
+  margin-right: 8px !important;
+  margin-top: 0 !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: #0d6efd !important;
+}
+
+.form-check-label {
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  font-weight: 400 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  user-select: none !important;
+}
+
+#studentPapers {
+  display: block !important;
+  border: 1px solid #ddd !important;
+  border-radius: 5px !important;
+  padding: 10px !important;
+  background-color: #fafafa !important;
+}
+
+#studentPapers .form-check {
+  margin-bottom: 6px !important;
+}
+
+#studentPapers .form-check:last-child {
+  margin-bottom: 0 !important;
+}
+
+
 @media (max-width: 768px) {
   .sidebar {
     left: -260px;
