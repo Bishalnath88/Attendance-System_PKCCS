@@ -698,11 +698,14 @@ def get_students():
             duration = 4 if is_bsc else 3
             
             # Calculate course end date and check if still active
-            course_end_date = get_course_end_date(admission_year, duration)
-            course_is_active = not has_course_ended(admission_year, duration)
+            # Use each student's admission_year (from the database record)
+            student_admission_year = student_dict.get('admission_year')
+            if student_admission_year:
+                course_end_date = get_course_end_date(student_admission_year, duration)
+                course_is_active = not has_course_ended(student_admission_year, duration)
+                student_dict['course_end_date'] = course_end_date.isoformat()
+                student_dict['course_active'] = course_is_active
             
-            student_dict['course_end_date'] = course_end_date.isoformat()
-            student_dict['course_active'] = course_is_active
             student_dict['course_duration'] = duration
             
             data.append(student_dict)
