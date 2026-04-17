@@ -58,6 +58,33 @@ CORS(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# ========== ERROR HANDLERS ==========
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 Not Found errors"""
+    return json_error("Endpoint not found.", 404)
+
+@app.errorhandler(405)
+def method_not_allowed(error):
+    """Handle 405 Method Not Allowed errors"""
+    return json_error("Method not allowed for this endpoint.", 405)
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 Internal Server errors with detailed logging"""
+    import traceback
+    error_trace = traceback.format_exc()
+    print(f"500 ERROR: {error_trace}", flush=True)
+    return json_error("Internal server error. Please check server logs.", 500)
+
+@app.errorhandler(Exception)
+def handle_exception(error):
+    """Handle all unhandled exceptions"""
+    import traceback
+    error_trace = traceback.format_exc()
+    print(f"UNHANDLED ERROR: {error_trace}", flush=True)
+    return json_error("An unexpected error occurred. Please try again later.", 500)
+
 # EMAIL REGEX PATTERN - validates email format
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Session timeout duration in hours
@@ -681,8 +708,14 @@ def get_students():
             data.append(student_dict)
         
         return jsonify(data)
-    except mysql.connector.Error:
-        return json_error("Unable to load students right now.", 500)
+    except mysql.connector.Error as db_error:
+        print(f"Database error in get_students: {db_error}", flush=True)
+        return json_error("Unable to load students from database.", 500)
+    except Exception as error:
+        print(f"Unexpected error in get_students: {error}", flush=True)
+        import traceback
+        print(traceback.format_exc(), flush=True)
+        return json_error("Unable to load students. Please try again later.", 500)
     finally:
         close_db(conn, cursor, rollback=False)
 

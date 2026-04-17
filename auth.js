@@ -7,8 +7,10 @@
  * ========================================
  */
 
-// API endpoint base URL (Railway deployment)
-const API_BASE_URL = "https://attendance-systempkccs-production.up.railway.app";
+// API endpoint base URL - uses local server or Railway deployment based on environment
+const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? `http://${window.location.hostname}:5000`
+  : "https://attendance-systempkccs-production.up.railway.app";
 
 /**
  * Get stored authentication token from localStorage
