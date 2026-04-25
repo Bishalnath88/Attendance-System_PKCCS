@@ -306,14 +306,6 @@
         <button type="submit" class="btn btn-login" id="loginBtn">
           <i class="fas fa-sign-in-alt me-2"></i>Sign In
         </button>
-
-        <div class="divider">
-          <span>Need an account first?</span>
-        </div>
-
-        <button type="button" class="btn btn-outline-primary w-100" id="registerBtn" style="border-radius: 12px;">
-          <i class="fas fa-user-plus me-2"></i>Create Account
-        </button>
       </form>
 
       <p class="helper-text mb-0">Passwords now require at least 6 characters.</p>
@@ -324,7 +316,6 @@
   <script>
     const loginForm = document.getElementById("loginForm")
     const loginBtn = document.getElementById("loginBtn")
-    const registerBtn = document.getElementById("registerBtn")
     const emailInput = document.getElementById("email")
     const passwordInput = document.getElementById("password")
     const feedback = document.getElementById("feedback")
@@ -376,41 +367,10 @@
       }
     }
 
-    async function handleRegister() {
-      clearFeedback()
 
-      const email = emailInput.value.trim().toLowerCase()
-      const password = passwordInput.value.trim()
-
-      if (!email || !password) {
-        showFeedback("Please enter both email and password to create an account.")
-        return
-      }
-
-      if (password.length < 6) {
-        showFeedback("Password must be at least 6 characters long.")
-        return
-      }
-
-      setSubmitting(true, registerBtn, "Create Account", "fas fa-user-plus")
-
-      try {
-        const result = await window.apiRequest("/register", {
-          method: "POST",
-          auth: false,
-          body: { email, password }
-        })
-        showFeedback(result.message || "Registration successful. You can sign in now.", "success")
-      } catch (error) {
-        showFeedback(error.message || "Unable to register right now.")
-      } finally {
-        setSubmitting(false, registerBtn, "Create Account", "fas fa-user-plus")
-      }
-    }
 
     document.addEventListener("DOMContentLoaded", () => {
       loginForm.addEventListener("submit", handleLogin)
-      registerBtn.addEventListener("click", handleRegister)
       emailInput.addEventListener("input", clearFeedback)
       passwordInput.addEventListener("input", clearFeedback)
     })
