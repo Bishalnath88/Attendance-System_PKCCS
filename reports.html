@@ -894,9 +894,13 @@
         // Load papers for the student's current semester
         try {
           const studentPapers = await window.apiRequest(`/courses/${foundStudent.course_id}/semesters/${currentSemester}/papers`)
-          studentPapersOptions = studentPapers || [] // Store for later use
+          studentPapersOptions = studentPapers || []
+          
+          // Always enable the dropdown to allow "All Papers" selection
+          paperSelect.disabled = false
           paperSelect.innerHTML = '<option value="">All Papers</option>'
           
+          // Add papers to dropdown if available
           if (studentPapers && studentPapers.length > 0) {
             studentPapers.forEach(paper => {
               const option = document.createElement("option")
@@ -904,14 +908,16 @@
               option.textContent = paper.name + (paper.code ? ` (${paper.code})` : "")
               paperSelect.appendChild(option)
             })
-            paperSelect.disabled = false
           } else {
-            paperSelect.disabled = true
+            // Even if no papers found, dropdown remains enabled for "All Papers"
+            console.log("No papers found for this student's semester")
           }
         } catch (error) {
+          console.log("Error loading papers:", error)
           studentPapersOptions = []
+          paperSelect.disabled = false
           paperSelect.innerHTML = '<option value="">All Papers</option>'
-          paperSelect.disabled = true
+          // Dropdown remains enabled even if error occurs
         }
 
         // Enable generate button
