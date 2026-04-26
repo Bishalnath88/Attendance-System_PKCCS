@@ -790,6 +790,47 @@
     let studentReportData = []
     let studentPapersOptions = [] // Store papers for the current student
 
+    // Function to calculate current semester based on admission year and course
+    function calculateCurrentSemester(admissionYear, courseName) {
+      const today = new Date()
+      const currentYear = today.getFullYear()
+      const currentMonth = today.getMonth() + 1 // 1-12
+
+      // Determine course duration (years -> semesters)
+      const isBSc = courseName && (courseName.includes('BSc') || courseName.includes('Bachelor of Science'))
+      const courseDurationYears = isBSc ? 4 : 3
+      const totalSemesters = courseDurationYears * 2
+
+      // Academic year runs from August to July
+      // August-July is considered one academic year
+      let yearsCompleted = 0
+
+      if (currentMonth >= 8) {
+        // August onwards in current year
+        yearsCompleted = currentYear - admissionYear
+      } else {
+        // January to July - still in previous academic year
+        yearsCompleted = currentYear - admissionYear - 1
+      }
+
+      // Calculate current semester (2 semesters per year)
+      let currentSemester = (yearsCompleted * 2) + 1
+
+      // Handle odd/even semesters in current year
+      if (currentMonth >= 8) {
+        currentSemester = (yearsCompleted * 2) + 1 // First semester of academic year
+      } else {
+        currentSemester = (yearsCompleted * 2) + 2 // Second semester of academic year
+      }
+
+      // Ensure semester doesn't exceed total available semesters
+      if (currentSemester > totalSemesters) {
+        currentSemester = totalSemesters
+      }
+
+      return currentSemester
+    }
+
     window.searchStudentByRoll = async function() {
       const rollInput = document.getElementById("studentRollNumber").value.trim()
       const resultDiv = document.getElementById("studentSearchResult")
@@ -827,7 +868,13 @@
         // Get course name
         const courseName = courses.find(c => c.id === foundStudent.course_id)?.name || "Unknown"
         
-        // Display student info
+        // Calculate current semester based on admission year and course
+        const currentSemester = calculateCurrentSemester(foundStudent.admission_year, courseName)
+        
+        // Store current semester in selected student for later use
+        selectedStudent.currentSemester = currentSemester
+        
+        // Display student info with calculated current semester
         resultDiv.innerHTML = `
           <div class="alert alert-success" role="alert">
             <h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Student Found</h6>
@@ -838,15 +885,15 @@
               </div>
               <div class="col-md-6">
                 <p class="mb-1"><strong>Course:</strong> ${window.escapeHtml(courseName)}</p>
-                <p class="mb-0"><strong>Semester:</strong> ${foundStudent.semester}</p>
+                <p class="mb-0"><strong>Semester:</strong> ${currentSemester}</p>
               </div>
             </div>
           </div>
         `
 
-        // Load papers for the student's course/semester
+        // Load papers for the student's current semester
         try {
-          const studentPapers = await window.apiRequest(`/courses/${foundStudent.course_id}/semesters/${foundStudent.semester}/papers`)
+          const studentPapers = await window.apiRequest(`/courses/${foundStudent.course_id}/semesters/${currentSemester}/papers`)
           studentPapersOptions = studentPapers || [] // Store for later use
           paperSelect.innerHTML = '<option value="">All Papers</option>'
           
@@ -993,7 +1040,7 @@
         ["Name", window.escapeHtml(selectedStudent.name)],
         ["Roll Number", selectedStudent.roll],
         ["Course", courseName],
-        ["Semester", selectedStudent.semester],
+        ["Semester", selectedStudent.currentSemester],
         [""],
         ["Date", "Paper", "Status"],
         ...studentReportData.map(record => [
