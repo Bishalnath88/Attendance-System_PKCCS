@@ -176,6 +176,111 @@
         </div>
       </div>
 
+      <!-- ========== INDIVIDUAL STUDENT REPORT SECTION ========== -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5>Individual Student Report</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-3">Search and view attendance report for a specific student by roll number.</p>
+          <div class="row gy-3">
+            <div class="col-md-4">
+              <label for="studentRollNumber" class="form-label">Roll Number</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="studentRollNumber" placeholder="Enter roll number">
+                <button class="btn btn-outline-secondary" type="button" onclick="searchStudentByRoll()">
+                  <i class="fas fa-search"></i> Search
+                </button>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label for="studentPaper" class="form-label">Paper (Optional)</label>
+              <select class="form-select" id="studentPaper" disabled>
+                <option value="">All Papers</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">&nbsp;</label>
+              <div>
+                <button class="btn btn-success w-100" id="generateStudentReportBtn" onclick="generateIndividualReport()" disabled>
+                  <i class="fas fa-file-pdf me-2"></i>Generate Student Report
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="row gy-3 mt-2">
+            <div class="col-md-3">
+              <label for="studentStartDate" class="form-label">Start Date</label>
+              <input type="date" class="form-control" id="studentStartDate">
+            </div>
+            <div class="col-md-3">
+              <label for="studentEndDate" class="form-label">End Date</label>
+              <input type="date" class="form-control" id="studentEndDate">
+            </div>
+            <div class="col-md-6"></div>
+          </div>
+          <div id="studentSearchResult" class="mt-3">
+            <p class="text-muted text-center mb-0">Enter roll number and click Search to view student details.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== INDIVIDUAL STUDENT ATTENDANCE TABLE ========== -->
+      <div class="card mb-4" id="studentReportCardContainer" style="display: none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5>Student Attendance Details</h5>
+          <button class="btn btn-success btn-sm" onclick="downloadStudentReport()">
+            <i class="fas fa-download me-2"></i>Download CSV
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle" id="studentReportTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Paper</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="studentReportTableBody">
+                <tr>
+                  <td colspan="3" class="text-center py-4">No attendance records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-12">
+              <div class="card bg-light">
+                <div class="card-body">
+                  <h6 class="card-title">Summary</h6>
+                  <div class="row">
+                    <div class="col-md-3">
+                      <p class="mb-2"><strong>Total Days:</strong> <span id="studentTotalDays" class="text-dark">0</span></p>
+                    </div>
+                    <div class="col-md-3">
+                      <p class="mb-2"><strong>Present:</strong> <span id="studentPresent" class="badge bg-success">0</span></p>
+                    </div>
+                    <div class="col-md-3">
+                      <p class="mb-2"><strong>Absent:</strong> <span id="studentAbsent" class="badge bg-danger">0</span></p>
+                    </div>
+                    <div class="col-md-3">
+                      <p class="mb-2"><strong>Late:</strong> <span id="studentLate" class="badge bg-warning text-dark">0</span></p>
+                    </div>
+                  </div>
+                  <div class="row mt-2">
+                    <div class="col-md-12">
+                      <h6>Attendance Percentage: <strong class="text-primary" id="studentPercentage">0%</strong></h6>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="row">
         <div class="col-md-6 mb-4">
           <div class="card">
@@ -508,6 +613,11 @@
           option.textContent = course.name
           courseSelect.appendChild(option)
         })
+
+        // Initialize date fields for both report sections
+        const range = getDefaultDateRange()
+        document.getElementById("studentStartDate").value = range.start
+        document.getElementById("studentEndDate").value = range.end
       } catch (error) {
         setAlert(error.message || "Unable to load report data right now.")
       }
@@ -672,6 +782,256 @@
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
       setAlert("Report downloaded successfully.", "success")
+    }
+
+    // ========== INDIVIDUAL STUDENT REPORT FUNCTIONS ==========
+    let selectedStudent = null
+    let selectedStudentPaperId = null
+    let studentReportData = []
+    let studentPapersOptions = [] // Store papers for the current student
+
+    window.searchStudentByRoll = async function() {
+      const rollInput = document.getElementById("studentRollNumber").value.trim()
+      const resultDiv = document.getElementById("studentSearchResult")
+      const paperSelect = document.getElementById("studentPaper")
+      const generateBtn = document.getElementById("generateStudentReportBtn")
+      const reportCard = document.getElementById("studentReportCardContainer")
+
+      if (!rollInput) {
+        resultDiv.innerHTML = '<p class="text-danger text-center mb-0">Please enter a roll number.</p>'
+        generateBtn.disabled = true
+        paperSelect.disabled = true
+        reportCard.style.display = "none"
+        selectedStudent = null
+        selectedStudentPaperId = null
+        return
+      }
+
+      try {
+        // Find student by roll number (case-insensitive)
+        const foundStudent = students.find(s => s.roll && s.roll.toLowerCase() === rollInput.toLowerCase())
+        
+        if (!foundStudent) {
+          resultDiv.innerHTML = '<p class="text-warning text-center mb-0"><i class="fas fa-exclamation-triangle"></i> No student found with roll number: ' + window.escapeHtml(rollInput) + '</p>'
+          generateBtn.disabled = true
+          paperSelect.disabled = true
+          reportCard.style.display = "none"
+          selectedStudent = null
+          selectedStudentPaperId = null
+          return
+        }
+
+        selectedStudent = foundStudent
+        selectedStudentPaperId = null
+        
+        // Get course name
+        const courseName = courses.find(c => c.id === foundStudent.course_id)?.name || "Unknown"
+        
+        // Display student info
+        resultDiv.innerHTML = `
+          <div class="alert alert-success" role="alert">
+            <h6 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Student Found</h6>
+            <div class="row">
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Name:</strong> ${window.escapeHtml(foundStudent.name)}</p>
+                <p class="mb-1"><strong>Roll Number:</strong> ${window.escapeHtml(foundStudent.roll)}</p>
+              </div>
+              <div class="col-md-6">
+                <p class="mb-1"><strong>Course:</strong> ${window.escapeHtml(courseName)}</p>
+                <p class="mb-0"><strong>Semester:</strong> ${foundStudent.semester}</p>
+              </div>
+            </div>
+          </div>
+        `
+
+        // Load papers for the student's course/semester
+        try {
+          const studentPapers = await window.apiRequest(`/courses/${foundStudent.course_id}/semesters/${foundStudent.semester}/papers`)
+          studentPapersOptions = studentPapers || [] // Store for later use
+          paperSelect.innerHTML = '<option value="">All Papers</option>'
+          
+          if (studentPapers && studentPapers.length > 0) {
+            studentPapers.forEach(paper => {
+              const option = document.createElement("option")
+              option.value = paper.id
+              option.textContent = paper.name + (paper.code ? ` (${paper.code})` : "")
+              paperSelect.appendChild(option)
+            })
+            paperSelect.disabled = false
+          } else {
+            paperSelect.disabled = true
+          }
+        } catch (error) {
+          studentPapersOptions = []
+          paperSelect.innerHTML = '<option value="">All Papers</option>'
+          paperSelect.disabled = true
+        }
+
+        // Enable generate button
+        generateBtn.disabled = false
+        reportCard.style.display = "none"
+      } catch (error) {
+        resultDiv.innerHTML = '<p class="text-danger text-center mb-0"><i class="fas fa-times-circle"></i> Error searching for student: ' + (error.message || "Unknown error") + '</p>'
+        generateBtn.disabled = true
+        paperSelect.disabled = true
+        reportCard.style.display = "none"
+        selectedStudent = null
+        selectedStudentPaperId = null
+      }
+    }
+
+    window.generateIndividualReport = async function() {
+      if (!selectedStudent) {
+        alert("Please search for a student first.")
+        return
+      }
+
+      const startDate = document.getElementById("studentStartDate").value
+      const endDate = document.getElementById("studentEndDate").value
+      const paperSelect = document.getElementById("studentPaper")
+
+      if (!startDate || !endDate) {
+        alert("Please select both start and end dates.")
+        return
+      }
+
+      if (startDate > endDate) {
+        alert("Start date cannot be later than end date.")
+        return
+      }
+
+      const generateBtn = document.getElementById("generateStudentReportBtn")
+      generateBtn.disabled = true
+      generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generating...'
+
+      try {
+        // Fetch attendance records for the date range
+        const filteredAttendance = await window.apiRequest("/attendance", {
+          query: {
+            start_date: startDate,
+            end_date: endDate
+          }
+        })
+
+        // Filter attendance for this student
+        let studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(selectedStudent.id))
+
+        // Store selected paper ID if one is chosen
+        selectedStudentPaperId = paperSelect.value ? Number(paperSelect.value) : null
+
+        // Filter by paper if selected
+        if (selectedStudentPaperId) {
+          const selectedPaper = studentPapersOptions.find(p => p.id === selectedStudentPaperId)
+          if (selectedPaper) {
+            studentAttendance = studentAttendance.filter(record => record.subject === selectedPaper.name)
+          }
+        }
+
+        // Build report data
+        const totalDays = studentAttendance.length
+        const present = studentAttendance.filter(record => record.status === "present").length
+        const absent = studentAttendance.filter(record => record.status === "absent").length
+        const late = studentAttendance.filter(record => record.status === "late").length
+        const percentage = calculateAttendancePercentage(present, late, totalDays)
+
+        // Display student report details
+        studentReportData = studentAttendance.sort((a, b) => new Date(b.date) - new Date(a.date))
+        
+        const reportTableBody = document.getElementById("studentReportTableBody")
+        if (studentReportData.length === 0) {
+          reportTableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4">No attendance records found for the selected date range and paper.</td></tr>'
+        } else {
+          reportTableBody.innerHTML = studentReportData.map(record => {
+            const statusBadge = record.status === 'present' 
+              ? '<span class="badge bg-success">Present</span>'
+              : record.status === 'absent'
+              ? '<span class="badge bg-danger">Absent</span>'
+              : '<span class="badge bg-warning text-dark">Late</span>'
+            
+            return `
+              <tr>
+                <td>${record.date}</td>
+                <td>${window.escapeHtml(record.subject)}</td>
+                <td>${statusBadge}</td>
+              </tr>
+            `
+          }).join("")
+        }
+
+        // Update summary
+        document.getElementById("studentTotalDays").textContent = totalDays
+        document.getElementById("studentPresent").textContent = present
+        document.getElementById("studentAbsent").textContent = absent
+        document.getElementById("studentLate").textContent = late
+        document.getElementById("studentPercentage").textContent = `${percentage}%`
+
+        // Show report card
+        document.getElementById("studentReportCardContainer").style.display = "block"
+
+        // Scroll to report
+        setTimeout(() => {
+          document.getElementById("studentReportCardContainer").scrollIntoView({ behavior: "smooth" })
+        }, 100)
+
+      } catch (error) {
+        alert("Error generating report: " + (error.message || "Unknown error"))
+      } finally {
+        generateBtn.disabled = false
+        generateBtn.innerHTML = '<i class="fas fa-file-pdf me-2"></i>Generate Student Report'
+      }
+    }
+
+    window.downloadStudentReport = function() {
+      if (!selectedStudent || studentReportData.length === 0) {
+        alert("No report data available to download. Generate a report first.")
+        return
+      }
+
+      const courseName = courses.find(c => c.id === selectedStudent.course_id)?.name || "Unknown"
+      const csvRows = [
+        ["Student Report"],
+        ["Name", window.escapeHtml(selectedStudent.name)],
+        ["Roll Number", selectedStudent.roll],
+        ["Course", courseName],
+        ["Semester", selectedStudent.semester],
+        [""],
+        ["Date", "Paper", "Status"],
+        ...studentReportData.map(record => [
+          record.date,
+          record.subject,
+          record.status.charAt(0).toUpperCase() + record.status.slice(1)
+        ])
+      ]
+
+      // Add summary
+      const totalDays = document.getElementById("studentTotalDays").textContent
+      const present = document.getElementById("studentPresent").textContent
+      const absent = document.getElementById("studentAbsent").textContent
+      const late = document.getElementById("studentLate").textContent
+      const percentage = document.getElementById("studentPercentage").textContent
+
+      csvRows.push([""])
+      csvRows.push(["Summary"])
+      csvRows.push(["Total Days", totalDays])
+      csvRows.push(["Present", present])
+      csvRows.push(["Absent", absent])
+      csvRows.push(["Late", late])
+      csvRows.push(["Attendance %", percentage])
+
+      const csvContent = csvRows
+        .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `student_report_${selectedStudent.roll}_${window.getTodayLocalDate()}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      alert("Report downloaded successfully.")
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
