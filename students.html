@@ -238,10 +238,10 @@
             <td>${window.escapeHtml(student.email)}</td>
             <td>${window.escapeHtml(student.phone || "-")}</td>
             <td class="text-center">
-              <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent(${Number(student.id)})" aria-label="Edit ${window.escapeHtml(student.name)}">
+              <button class="btn btn-sm btn-outline-primary me-2" onclick="openEditStudent('${student.id}')" aria-label="Edit ${window.escapeHtml(student.name)}">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${Number(student.id)})" aria-label="Delete ${window.escapeHtml(student.name)}">
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent('${student.id}')" aria-label="Delete ${window.escapeHtml(student.name)}">
                 <i class="fas fa-trash"></i>
               </button>
             </td>
@@ -432,7 +432,7 @@
     }
 
     window.openEditStudent = function(studentId) {
-      const student = students.find(item => Number(item.id) === Number(studentId))
+      const student = students.find(item => String(item.id) === String(studentId))
       if (!student) {
         setAlert("Unable to find that student record.")
         return
@@ -480,10 +480,10 @@
       // Get selected papers
       const selectedPapers = Array.from(
         document.querySelectorAll('#studentPapers input[type="checkbox"]:checked')
-      ).map(checkbox => Number(checkbox.value))
+      ).map(checkbox => checkbox.value)  // Keep as string (Firestore document ID)
 
-      if (!name || !roll || !courseId || !semester || !admissionYear || !email || !phone) {
-        setAlert("Please fill in all required student fields.")
+      if (!name || !roll || !courseId || !semester || !admissionYear || !email) {
+        setAlert("Please fill in all required student fields (phone is optional).")
         return
       }
 
@@ -499,7 +499,7 @@
         const payload = {
           name,
           roll,
-          course_id: Number(courseId),
+          course_id: courseId,  // Keep as string (Firestore document ID)
           semester: Number(semester),
           admission_year: Number(admissionYear),
           papers: selectedPapers,
@@ -522,7 +522,7 @@
     }
 
     window.deleteStudent = async function(studentId) {
-      const student = students.find(item => Number(item.id) === Number(studentId))
+      const student = students.find(item => String(item.id) === String(studentId))
       if (!student) {
         setAlert("Unable to find that student record.")
         return
@@ -542,7 +542,7 @@
       }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
       window.populateUserInfo()
       window.setupSidebar()
       // Initialize custom modal
@@ -552,9 +552,9 @@
         event.preventDefault()
         window.saveStudent()
       })
-      loadCourses()
-      loadAdmissionYears()
-      loadStudents()
+      await loadCourses()
+      await loadAdmissionYears()
+      await loadStudents()
     })
   </script>
   <!-- Bootstrap 5 JavaScript bundle -->

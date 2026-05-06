@@ -110,6 +110,25 @@ def json_error(message, status_code=400):
     return jsonify({"message": message}), status_code
 
 
+def get_db_config():
+    """Not needed for Firestore - kept for compatibility"""
+    pass
+
+
+def ensure_database_schema():
+    """
+    For Firestore, schema is flexible and created on-demand.
+    This function is kept for compatibility but does nothing.
+    """
+    pass
+
+
+def get_db():
+    """Get Firestore database instance"""
+    from firebase_config import get_db as fb_get_db
+    return fb_get_db()
+
+
 def serialize_value(value):
     """Convert Python objects to JSON-serializable format"""
     if isinstance(value, datetime):
@@ -131,7 +150,7 @@ def serialize_doc(doc):
     return data
 
 
-def add_batch_to_student(student, courses_cache=None):
+def add_batch_to_student(student):
     """Add batch information and current semester to a student record"""
     try:
         if 'admission_year' not in student:
@@ -141,18 +160,14 @@ def add_batch_to_student(student, courses_cache=None):
         admission_year = student.get('admission_year')
         course_id = student.get('course_id')
         
-        # Use cached course or query if no cache provided
-        if courses_cache and course_id in courses_cache:
-            course = courses_cache[course_id]
-        else:
-            # Fallback: Query course if not in cache
-            db = get_db()
-            course_doc = db.collection("courses").document(course_id).get()
-            
-            if not course_doc.exists:
-                return student
-            
-            course = course_doc.to_dict()
+        # Query course to check if BSc (4 years) or other (3 years)
+        db = get_db()
+        course_doc = db.collection("courses").document(course_id).get()
+        
+        if not course_doc.exists:
+            return student
+        
+        course = course_doc.to_dict()
         
         # Check for both "BSc" and "Bachelor of Science"
         is_bsc = 'BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', '')
@@ -292,6 +307,38 @@ def parse_json_body(expected_type=dict):
     return data
 
 
+def calculate_batch(admission_year, course_id, course_duration_map=None):
+    # Calculate batch (e.g., 2023-2027 for BSc, 2023-2026 for other courses)
+    # BSc is 4 years, others are 3 years
+    # course_duration_map is used for testing, otherwise queries DB
+    if course_duration_map is None:
+        course_duration_map = {}
+    
+    # Check if this is a BSc course (4 years duration)
+    is_bsc = False
+    
+    if course_id in course_duration_map:
+        duration = course_duration_map[course_id]
+    else:
+        # Query database to check course name
+        conn = cursor = None
+        try:
+            conn = get_db()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT name FROM courses WHERE id = %s", (course_id,))
+            course = cursor.fetchone()
+            if course and ('BSc' in course.get('name', '') or 'Bachelor of Science' in course.get('name', '')):
+                is_bsc = True
+        except:
+            pass
+        finally:
+            close_db(conn, cursor)
+    
+    duration = 4 if is_bsc else 3
+    end_year = admission_year + duration
+    return f"{admission_year}-{end_year}"
+
+
 def validate_login_payload(data):
     # Validate login request payload
     email = normalize_email(data.get("email"))
@@ -317,19 +364,18 @@ def validate_student_payload(data):
     email = normalize_email(data.get("email"))
     phone = normalize_text(data.get("phone", ""))
 
-    # Core required fields (name, roll, course_id, semester, email are mandatory)
-    if not all([name, roll, course_id, semester, email]):
-        return None, "All student fields (name, roll, course, semester, email) are required."
+    if not all([name, roll, course_id, semester, email, phone]):
+        return None, "All student fields (name, roll, course, semester, email, phone) are required."
 
     if not is_valid_email(email):
         return None, "Please enter a valid student email address."
 
-    # Validate phone number format only if provided (optional field)
-    if phone and not re.match(r"^[\d\s+\-()]{10,15}$", phone):
+    # Validate phone number format (10-15 digits allowed, with optional country code)
+    if not re.match(r"^[\d\s+\-()]{10,15}$", phone):
         return None, "Please enter a valid phone number (10-15 digits)."
 
     try:
-        course_id = str(course_id)
+        course_id = int(course_id)
         semester = int(semester)
         # admission_year is optional - use current year as default if not provided
         if admission_year:
@@ -345,7 +391,7 @@ def validate_student_payload(data):
         return None, f"Admission year must be between {current_year - 20} and {current_year + 2}."
 
     # Validate semester is in reasonable range (1-8 for any course)
-    # Actual validation happens in endpoint when checking against course_semesters collection
+    # Actual validation happens in endpoint when checking against course_semesters table
     if semester < 1 or semester > 8:
         return None, "Semester must be between 1 and 8."
 
@@ -388,8 +434,11 @@ def validate_attendance_records(records):
 
         # Parse student ID
         raw_student_id = record.get("student_id", record.get("studentId"))
-        student_id = raw_student_id  # In Firestore, student_id is the document ID
-        
+        try:
+            student_id = int(raw_student_id)
+        except (TypeError, ValueError):
+            return None, f"Attendance item {index} has an invalid student ID."
+
         # Parse and validate attendance date
         attendance_date = parse_attendance_date(record.get("date"))
         if attendance_date is None:
@@ -413,27 +462,6 @@ def validate_attendance_records(records):
         })
 
     return normalized_records, None
-
-
-def get_course_end_date(admission_year, course_duration):
-    """Calculate course end date (July of final year)
-    
-    Academic Calendar:
-    - Batch starts: August (mid-year)
-    - Batch ends: July (mid-year)
-    - 2 semesters per year = 1 academic year
-    
-    Course end = admission_year + duration, July 31st
-    """
-    end_year = admission_year + course_duration
-    return date(end_year, 7, 31)
-
-
-def has_course_ended(admission_year, course_duration):
-    """Check if a student's course has ended based on today's date"""
-    end_date = get_course_end_date(admission_year, course_duration)
-    today = date.today()
-    return today > end_date
 
 
 # ========== AUTHENTICATION ENDPOINTS ==========
@@ -549,7 +577,31 @@ def me():
     return jsonify({"email": g.user_email})
 
 
-# ========== STUDENTS ENDPOINTS ==========
+def get_course_end_date(admission_year, course_duration):
+    """Calculate course end date (July of final year)
+    
+    Academic Calendar:
+    - Batch starts: August (mid-year)
+    - Batch ends: July (mid-year)
+    - 2 semesters per year = 1 academic year
+    
+    Course end = admission_year + duration, July 31st
+    
+    Example:
+    - Admitted Aug 2023, 4-year BSc: 2023 + 4 = ends July 2027
+    - Admitted Aug 2023, 3-year other: 2023 + 3 = ends July 2026
+    """
+    end_year = admission_year + course_duration
+    return date(end_year, 7, 31)
+
+
+def has_course_ended(admission_year, course_duration):
+    """Check if a student's course has ended based on today's date"""
+    end_date = get_course_end_date(admission_year, course_duration)
+    today = date.today()
+    return today > end_date
+
+
 @app.route("/students", methods=["GET"])
 @require_auth
 def get_students():
@@ -557,44 +609,68 @@ def get_students():
     # Optional query parameter: admission_year (to filter by batch)
     admission_year = request.args.get("admission_year", type=int)
     
+    conn = cursor = None
     try:
-        db = get_db()
-        students_ref = get_students_ref()
-        
-        # Fetch all courses ONCE for batch calculation
-        courses_cache = {}
-        for course_doc in get_courses_ref().stream():
-            course_data = course_doc.to_dict()
-            course_data['id'] = course_doc.id
-            courses_cache[course_doc.id] = course_data
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
         
         if admission_year:
-            # Fetch students with the specified admission year
-            query = students_ref.where("admission_year", "==", admission_year)
+            # Fetch students with their courses for the specified batch (admission year)
+            # Returns ALL students from that admission year regardless of course status
+            cursor.execute("""
+                SELECT s.*, c.name as course_name
+                FROM students s
+                JOIN courses c ON s.course_id = c.id
+                WHERE s.admission_year = %s
+                ORDER BY s.name ASC, s.roll ASC
+            """, (admission_year,))
         else:
-            # Retrieve all students
-            query = students_ref
+            # Retrieve all students, sorted by name then by roll number
+            cursor.execute("""
+                SELECT s.*, c.name as course_name
+                FROM students s
+                JOIN courses c ON s.course_id = c.id
+                ORDER BY s.name ASC, s.roll ASC
+            """)
         
-        docs = list(query.stream())
+        rows = cursor.fetchall()
         data = []
         
-        for doc in docs:
-            student_dict = serialize_doc(doc)
+        for row in rows:
+            student_dict = serialize_row(row)
             
-            # Add batch info using cached courses (avoid N+1 query problem)
-            student_dict = add_batch_to_student(student_dict, courses_cache)
+            # Add batch info and calculate course status
+            student_dict = add_batch_to_student(student_dict)
+            
+            # Add course duration and active status for attendance purposes
+            course_name = row.get('course_name', '')
+            is_bsc = 'BSc' in course_name or 'Bachelor of Science' in course_name
+            duration = 4 if is_bsc else 3
+            
+            # Calculate course end date and check if still active
+            # Use each student's admission_year (from the database record)
+            student_admission_year = student_dict.get('admission_year')
+            if student_admission_year:
+                course_end_date = get_course_end_date(student_admission_year, duration)
+                course_is_active = not has_course_ended(student_admission_year, duration)
+                student_dict['course_end_date'] = course_end_date.isoformat()
+                student_dict['course_active'] = course_is_active
+            
+            student_dict['course_duration'] = duration
             
             data.append(student_dict)
         
-        # Sort client-side by name and roll
-        data.sort(key=lambda x: (x.get('name', ''), x.get('roll', '')))
-        
         return jsonify(data)
+    except mysql.connector.Error as db_error:
+        print(f"Database error in get_students: {db_error}", flush=True)
+        return json_error("Unable to load students from database.", 500)
     except Exception as error:
-        print(f"Error in get_students: {error}", flush=True)
+        print(f"Unexpected error in get_students: {error}", flush=True)
         import traceback
         print(traceback.format_exc(), flush=True)
         return json_error("Unable to load students. Please try again later.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 @app.route("/students", methods=["POST"])
@@ -609,68 +685,91 @@ def add_student():
     if error_message:
         return json_error(error_message)
 
+    conn = cursor = None
     try:
-        db = get_db()
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
         
         # Verify course exists
-        course_doc = get_courses_ref().document(student["course_id"]).get()
-        if not course_doc.exists:
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (student["course_id"],))
+        if not cursor.fetchone():
             return json_error("Selected course does not exist.", 404)
         
         # Verify semester exists for this course
-        query = get_course_semesters_ref().where("course_id", "==", student["course_id"]).where("semester", "==", student["semester"]).limit(1)
-        if not list(query.stream()):
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (student["course_id"], student["semester"]),
+        )
+        if not cursor.fetchone():
             return json_error("Selected semester is not available for this course.", 404)
         
         # Verify all papers exist for this course/semester
         if student["papers"]:
-            papers_docs = []
-            for paper_id in student["papers"]:
-                paper_doc = get_papers_ref().document(paper_id).get()
-                if paper_doc.exists:
-                    paper_data = paper_doc.to_dict()
-                    if paper_data.get("course_id") == student["course_id"] and paper_data.get("semester") == student["semester"]:
-                        papers_docs.append(paper_doc)
-            
-            if len(papers_docs) != len(student["papers"]):
+            placeholders = ", ".join(["%s"] * len(student["papers"]))
+            cursor.execute(
+                f"SELECT id FROM papers WHERE course_id = %s AND semester = %s AND id IN ({placeholders})",
+                (student["course_id"], student["semester"], *student["papers"]),
+            )
+            valid_papers = {row["id"] for row in cursor.fetchall()}
+            if len(valid_papers) != len(student["papers"]):
                 return json_error("One or more selected papers do not exist for this course/semester.", 404)
         
-        # Check if roll or email already exists
-        query = get_students_ref().where("roll", "==", student["roll"]).limit(1)
-        if list(query.stream()):
-            return json_error("Roll number already exists.", 409)
+        cursor.execute(
+            "SELECT id FROM students WHERE roll = %s OR email = %s",
+            (student["roll"], student["email"]),
+        )
+        if cursor.fetchone():
+            return json_error("Roll number or email already exists.", 409)
+
+        try:
+            # Try to insert with admission_year column
+            cursor.execute(
+                "INSERT INTO students (name, roll, course_id, semester, admission_year, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    student["name"],
+                    student["roll"],
+                    student["course_id"],
+                    student["semester"],
+                    student["admission_year"],
+                    json.dumps(student["papers"]),
+                    student["email"],
+                    student["phone"],
+                ),
+            )
+        except mysql.connector.Error as e:
+            # If admission_year column doesn't exist, insert without it (backward compatibility)
+            if "Unknown column" in str(e):
+                cursor.execute(
+                    "INSERT INTO students (name, roll, course_id, semester, papers, email, phone) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        student["name"],
+                        student["roll"],
+                        student["course_id"],
+                        student["semester"],
+                        json.dumps(student["papers"]),
+                        student["email"],
+                        student["phone"],
+                    ),
+                )
+            else:
+                raise
         
-        query = get_students_ref().where("email", "==", student["email"]).limit(1)
-        if list(query.stream()):
-            return json_error("Email already exists.", 409)
+        conn.commit()
 
-        # Create student document
-        doc_ref = get_students_ref().add({
-            "name": student["name"],
-            "roll": student["roll"],
-            "course_id": student["course_id"],
-            "semester": student["semester"],
-            "admission_year": student["admission_year"],
-            "papers": student["papers"],
-            "email": student["email"],
-            "phone": student["phone"],
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-        })
-
-        # Fetch and return created student
-        created_doc = get_students_ref().document(doc_ref[1].id).get()
-        created_student = add_batch_to_student(serialize_doc(created_doc))
+        student_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM students WHERE id = %s", (student_id,))
+        created_student = add_batch_to_student(serialize_row(cursor.fetchone()))
         return jsonify({
             "message": "Student added successfully.",
             "student": created_student,
         }), 201
-    except Exception as e:
-        print(f"Add student error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to add the student right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
-@app.route("/students/<student_id>", methods=["PUT"])
+@app.route("/students/<int:student_id>", methods=["PUT"])
 @require_auth
 def update_student(student_id):
     # Update student - modify existing student record - PUT /students/{student_id}
@@ -682,95 +781,119 @@ def update_student(student_id):
     if error_message:
         return json_error(error_message)
 
+    conn = cursor = None
     try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
         # Check if student exists
-        student_doc = get_students_ref().document(student_id).get()
-        if not student_doc.exists:
+        cursor.execute("SELECT id FROM students WHERE id = %s", (student_id,))
+        if not cursor.fetchone():
             return json_error("Student not found.", 404)
 
         # Verify course exists
-        course_doc = get_courses_ref().document(student["course_id"]).get()
-        if not course_doc.exists:
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (student["course_id"],))
+        if not cursor.fetchone():
             return json_error("Selected course does not exist.", 404)
         
         # Verify semester exists for this course
-        query = get_course_semesters_ref().where("course_id", "==", student["course_id"]).where("semester", "==", student["semester"]).limit(1)
-        if not list(query.stream()):
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (student["course_id"], student["semester"]),
+        )
+        if not cursor.fetchone():
             return json_error("Selected semester is not available for this course.", 404)
         
         # Verify all papers exist for this course/semester
         if student["papers"]:
-            papers_docs = []
-            for paper_id in student["papers"]:
-                paper_doc = get_papers_ref().document(paper_id).get()
-                if paper_doc.exists:
-                    paper_data = paper_doc.to_dict()
-                    if paper_data.get("course_id") == student["course_id"] and paper_data.get("semester") == student["semester"]:
-                        papers_docs.append(paper_doc)
-            
-            if len(papers_docs) != len(student["papers"]):
+            placeholders = ", ".join(["%s"] * len(student["papers"]))
+            cursor.execute(
+                f"SELECT id FROM papers WHERE course_id = %s AND semester = %s AND id IN ({placeholders})",
+                (student["course_id"], student["semester"], *student["papers"]),
+            )
+            valid_papers = {row["id"] for row in cursor.fetchall()}
+            if len(valid_papers) != len(student["papers"]):
                 return json_error("One or more selected papers do not exist for this course/semester.", 404)
 
         # Ensure new roll/email don't conflict with other students
-        query = get_students_ref().where("roll", "==", student["roll"]).limit(1)
-        existing_docs = [doc for doc in query.stream() if doc.id != student_id]
-        if existing_docs:
-            return json_error("Roll number already belongs to another student.", 409)
+        cursor.execute(
+            "SELECT id FROM students WHERE (roll = %s OR email = %s) AND id <> %s",
+            (student["roll"], student["email"], student_id),
+        )
+        if cursor.fetchone():
+            return json_error("Roll number or email already belongs to another student.", 409)
+
+        try:
+            # Update student record with new values
+            cursor.execute(
+                "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, admission_year = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
+                (
+                    student["name"],
+                    student["roll"],
+                    student["course_id"],
+                    student["semester"],
+                    student["admission_year"],
+                    json.dumps(student["papers"]),
+                    student["email"],
+                    student["phone"],
+                    student_id,
+                ),
+            )
+        except mysql.connector.Error as e:
+            # If admission_year column doesn't exist, update without it (backward compatibility)
+            if "Unknown column" in str(e):
+                cursor.execute(
+                    "UPDATE students SET name = %s, roll = %s, course_id = %s, semester = %s, papers = %s, email = %s, phone = %s WHERE id = %s",
+                    (
+                        student["name"],
+                        student["roll"],
+                        student["course_id"],
+                        student["semester"],
+                        json.dumps(student["papers"]),
+                        student["email"],
+                        student["phone"],
+                        student_id,
+                    ),
+                )
+            else:
+                raise
         
-        query = get_students_ref().where("email", "==", student["email"]).limit(1)
-        existing_docs = [doc for doc in query.stream() if doc.id != student_id]
-        if existing_docs:
-            return json_error("Email already belongs to another student.", 409)
+        conn.commit()
 
-        # Update student
-        get_students_ref().document(student_id).update({
-            "name": student["name"],
-            "roll": student["roll"],
-            "course_id": student["course_id"],
-            "semester": student["semester"],
-            "admission_year": student["admission_year"],
-            "papers": student["papers"],
-            "email": student["email"],
-            "phone": student["phone"],
-            "updated_at": datetime.utcnow(),
-        })
-
-        # Fetch and return updated student
-        updated_doc = get_students_ref().document(student_id).get()
-        updated_student = add_batch_to_student(serialize_doc(updated_doc))
+        cursor.execute("SELECT * FROM students WHERE id = %s", (student_id,))
+        updated_student = add_batch_to_student(serialize_row(cursor.fetchone()))
         return jsonify({
             "message": "Student updated successfully.",
             "student": updated_student,
         })
-    except Exception as e:
-        print(f"Update student error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to update the student right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
-@app.route("/students/<student_id>", methods=["DELETE"])
+@app.route("/students/<int:student_id>", methods=["DELETE"])
 @require_auth
 def delete_student(student_id):
     # Delete student - remove student record and related attendance - DELETE /students/{student_id}
+    conn = cursor = None
     try:
-        db = get_db()
-        
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
         # Verify student exists before attempting deletion
-        student_doc = get_students_ref().document(student_id).get()
-        if not student_doc.exists:
+        cursor.execute("SELECT id FROM students WHERE id = %s", (student_id,))
+        if not cursor.fetchone():
             return json_error("Student not found.", 404)
 
         # Delete all attendance records for this student (cascade delete)
-        attendance_query = get_attendance_ref().where("student_id", "==", student_id)
-        for doc in attendance_query.stream():
-            get_attendance_ref().document(doc.id).delete()
-        
+        cursor.execute("DELETE FROM attendance WHERE student_id = %s", (student_id,))
         # Delete the student record itself
-        get_students_ref().document(student_id).delete()
-        
+        cursor.execute("DELETE FROM students WHERE id = %s", (student_id,))
+        conn.commit()
         return jsonify({"message": "Student deleted successfully."})
-    except Exception as e:
-        print(f"Delete student error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to delete the student right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 # ========== COURSES ENDPOINTS ==========
@@ -778,63 +901,79 @@ def delete_student(student_id):
 @require_auth
 def get_courses():
     # Get all available courses - GET /courses
+    conn = cursor = None
     try:
-        docs = list(get_courses_ref().order_by("name").stream())
-        data = []
-        for doc in docs:
-            course = serialize_doc(doc)
-            data.append(course)
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, name, code FROM courses ORDER BY name ASC")
+        data = [serialize_row(row) for row in cursor.fetchall()]
         return jsonify(data)
-    except Exception as e:
-        print(f"Get courses error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to load courses right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 # ========== COURSE SEMESTERS ENDPOINTS ==========
-@app.route("/courses/<course_id>/semesters", methods=["GET"])
+@app.route("/courses/<int:course_id>/semesters", methods=["GET"])
 @require_auth
 def get_semesters(course_id):
     # Get semesters for a specific course - GET /courses/{course_id}/semesters
+    conn = cursor = None
     try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
         # Verify course exists
-        course_doc = get_courses_ref().document(course_id).get()
-        if not course_doc.exists:
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (course_id,))
+        if not cursor.fetchone():
             return json_error("Course not found.", 404)
         
-        query = get_course_semesters_ref().where("course_id", "==", course_id)
-        docs = list(query.stream())
-        data = [doc.to_dict().get("semester") for doc in docs]
-        return jsonify(sorted(set(data)))
-    except Exception as e:
-        print(f"Get semesters error: {e}", flush=True)
+        cursor.execute(
+            "SELECT semester FROM course_semesters WHERE course_id = %s ORDER BY semester ASC",
+            (course_id,),
+        )
+        data = [row["semester"] for row in cursor.fetchall()]
+        return jsonify(data)
+    except mysql.connector.Error:
         return json_error("Unable to load semesters right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 # ========== PAPERS ENDPOINTS ==========
-@app.route("/courses/<course_id>/semesters/<int:semester>/papers", methods=["GET"])
+@app.route("/courses/<int:course_id>/semesters/<int:semester>/papers", methods=["GET"])
 @require_auth
 def get_papers(course_id, semester):
     # Get papers for a specific course and semester - GET /courses/{course_id}/semesters/{semester}/papers
+    conn = cursor = None
     try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        
         # Verify course exists
-        course_doc = get_courses_ref().document(course_id).get()
-        if not course_doc.exists:
+        cursor.execute("SELECT id FROM courses WHERE id = %s", (course_id,))
+        if not cursor.fetchone():
             return json_error("Course not found.", 404)
         
         # Verify semester exists for this course
-        query = get_course_semesters_ref().where("course_id", "==", course_id).where("semester", "==", semester).limit(1)
-        if not list(query.stream()):
+        cursor.execute(
+            "SELECT id FROM course_semesters WHERE course_id = %s AND semester = %s",
+            (course_id, semester),
+        )
+        if not cursor.fetchone():
             return json_error("Semester not found for this course.", 404)
         
-        query = get_papers_ref().where("course_id", "==", course_id).where("semester", "==", semester)
-        docs = list(query.stream())
-        data = [serialize_doc(doc) for doc in docs]
-        # Sort by name client-side
-        data.sort(key=lambda x: x.get('name', ''))
+        cursor.execute(
+            "SELECT id, name, code FROM papers WHERE course_id = %s AND semester = %s ORDER BY name ASC",
+            (course_id, semester),
+        )
+        data = [serialize_row(row) for row in cursor.fetchall()]
         return jsonify(data)
-    except Exception as e:
-        print(f"Get papers error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to load papers right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 @app.route("/admission-years", methods=["GET"])
@@ -859,32 +998,45 @@ def get_batches():
     - BSc students: attendance until 4th year
     - Other courses: attendance until 3rd year (then stop)
     """
+    conn = cursor = None
     try:
-        # Get all unique admission years that have students
-        students_ref = get_students_ref()
-        docs = list(students_ref.stream())
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
         
-        admission_years = set()
-        for doc in docs:
-            admission_year = doc.to_dict().get('admission_year')
-            if admission_year:
-                admission_years.add(admission_year)
+        # Get all unique admission years that have students
+        cursor.execute("""
+            SELECT DISTINCT admission_year
+            FROM students
+            ORDER BY admission_year DESC
+        """)
+        records = cursor.fetchall()
         
         batches = []
-        for admission_year in sorted(admission_years, reverse=True):
+        seen = set()
+        
+        for record in records:
+            admission_year = record['admission_year']
+            
             # Calculate batch using 4-year duration (BSc standard)
             end_year = admission_year + 4
-            batches.append({
-                "batch": f"{admission_year}-{end_year}",
-                "admission_year": admission_year,
-                "end_year": end_year,
-                "duration": 4
-            })
+            batch_key = (admission_year, end_year)
+            
+            # Avoid duplicates
+            if batch_key not in seen:
+                seen.add(batch_key)
+                batches.append({
+                    "batch": f"{admission_year}-{end_year}",
+                    "admission_year": admission_year,
+                    "end_year": end_year,
+                    "duration": 4
+                })
         
         return jsonify(batches)
     except Exception as e:
         print(f"Error fetching batches: {e}")
         return jsonify([]), 500
+    finally:
+        close_db(conn, cursor)
 
 
 @app.route("/attendance", methods=["POST"])
@@ -899,59 +1051,70 @@ def save_attendance():
     if error_message:
         return json_error(error_message)
 
+    conn = cursor = None
     try:
-        db = get_db()
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
 
         # Extract and validate all student IDs
         student_ids = sorted({record["student_id"] for record in normalized_records})
-        valid_student_ids = set()
-        
-        students_ref = get_students_ref()
-        for student_id in student_ids:
-            if students_ref.document(student_id).get().exists:
-                valid_student_ids.add(student_id)
+        placeholders = ", ".join(["%s"] * len(student_ids))
+        cursor.execute(
+            f"SELECT id FROM students WHERE id IN ({placeholders})",
+            tuple(student_ids),
+        )
+        valid_student_ids = {row["id"] for row in cursor.fetchall()}
 
         # Check for any invalid student IDs
         missing_student_ids = sorted(set(student_ids) - valid_student_ids)
         if missing_student_ids:
             return json_error(
-                f"Unknown student IDs: {', '.join(str(sid) for sid in missing_student_ids)}.",
+                f"Unknown student IDs: {', '.join(str(student_id) for student_id in missing_student_ids)}.",
                 404,
             )
 
         # Process each attendance record: create if new, update if exists
         created_count = 0
         updated_count = 0
-        attendance_ref = get_attendance_ref()
 
         for record in normalized_records:
             # Check if attendance record already exists for this student/date/subject
-            query = attendance_ref.where("student_id", "==", record["student_id"]).where("date", "==", record["date"]).where("subject", "==", record["subject"]).limit(1)
-            existing_docs = list(query.stream())
+            cursor.execute(
+                "SELECT id FROM attendance WHERE student_id = %s AND date = %s AND subject = %s",
+                (record["student_id"], record["date"], record["subject"]),
+            )
+            existing = cursor.fetchone()
 
-            if existing_docs:
+            if existing:
                 # Record exists - update the status
-                attendance_ref.document(existing_docs[0].id).update({"status": record["status"]})
+                cursor.execute(
+                    "UPDATE attendance SET status = %s WHERE id = %s",
+                    (record["status"], existing["id"]),
+                )
                 updated_count += 1
             else:
                 # Record doesn't exist - create new entry
-                attendance_ref.add({
-                    "student_id": record["student_id"],
-                    "date": record["date"],
-                    "subject": record["subject"],
-                    "status": record["status"],
-                    "created_at": datetime.utcnow(),
-                })
+                cursor.execute(
+                    "INSERT INTO attendance (student_id, date, subject, status) VALUES (%s, %s, %s, %s)",
+                    (
+                        record["student_id"],
+                        record["date"],
+                        record["subject"],
+                        record["status"],
+                    ),
+                )
                 created_count += 1
 
+        conn.commit()
         return jsonify({
             "message": "Attendance saved successfully.",
             "created": created_count,
             "updated": updated_count,
         })
-    except Exception as e:
-        print(f"Save attendance error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to save attendance right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 @app.route("/attendance", methods=["GET"])
@@ -965,20 +1128,32 @@ def get_attendance():
         - end_date (optional): Filter records until this date (YYYY-MM-DD)
         - subject (optional): Filter by subject name
     Returns: 200 OK with filtered array of attendance records, 500 on database error
+    
+    Fetches attendance records with optional filtering by date range and subject.
+    Deduplicates records by unique (student_id, date, subject) key to handle
+    any database inconsistencies. Sorts results by date, subject, and student_id
+    in reverse chronological order (newest first).
     """
     start_date = normalize_text(request.args.get("start_date"))
     end_date = normalize_text(request.args.get("end_date"))
     subject_filter = normalize_text(request.args.get("subject"))
 
+    conn = cursor = None
     try:
-        # Fetch all attendance records from Firestore
-        attendance_ref = get_attendance_ref()
-        docs = list(attendance_ref.stream())
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        # Fetch all attendance records from database
+        cursor.execute("SELECT * FROM attendance")
+        raw_rows = cursor.fetchall()
+
+        # Sort by ID to ensure consistent ordering
+        raw_rows.sort(key=lambda row: row.get("id") or 0)
         
         # Deduplicate records by (student_id, date, subject) key
+        # Keeps the last (highest ID) record for each combination
         deduplicated_records = {}
-        for doc in docs:
-            serialized = serialize_doc(doc)
+        for row in raw_rows:
+            serialized = serialize_row(row)
             key = (
                 serialized.get("student_id"),
                 serialized.get("date"),
@@ -1001,14 +1176,15 @@ def get_attendance():
             key=lambda record: (
                 record.get("date", ""),
                 record.get("subject", ""),
-                record.get("student_id", ""),
+                record.get("student_id", 0),
             ),
             reverse=True,
         )
         return jsonify(records)
-    except Exception as e:
-        print(f"Get attendance error: {e}", flush=True)
+    except mysql.connector.Error:
         return json_error("Unable to load attendance records right now.", 500)
+    finally:
+        close_db(conn, cursor, rollback=False)
 
 
 # ========== STATIC FILE SERVING ==========
@@ -1018,6 +1194,10 @@ def index():
     Serve index.html - entry point for web application
     GET /
     Returns: HTML index page which handles client-side routing
+    
+    This serves the main entry point of the application. The index.html file
+    contains client-side JavaScript that determines whether to show the login
+    page or dashboard based on the user's authentication status.
     """
     return send_from_directory('.', 'index.html')
 
@@ -1027,6 +1207,11 @@ def serve_static(path):
     Serve static files and HTML pages - generic file serving endpoint
     GET /<path:path>
     Returns: Requested file if it exists, 404 Not Found otherwise
+    
+    Handles serving all static assets (CSS, JS, HTML pages) from the current
+    directory. First attempts to serve the exact path, then tries adding .html
+    extension (e.g., /dashboard serves dashboard.html if dashboard doesn't exist).
+    This enables clean URLs without file extensions.
     """
     if os.path.exists(os.path.join('.', path)):
         return send_from_directory('.', path)

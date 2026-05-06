@@ -264,7 +264,7 @@
         ])
 
         const totalStudents = students.length
-        const studentsById = new Map(students.map(student => [Number(student.id), student]))
+        const studentsById = new Map(students.map(student => [student.id, student]))
         const coursesById = new Map(courses.map(course => [course.id, course]))
         const today = window.getTodayLocalDate()
         const todayRecords = attendance.filter(record => record.date === today)

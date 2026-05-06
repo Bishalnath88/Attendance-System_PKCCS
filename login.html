@@ -30,7 +30,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(180deg, #153e64 0%, #719dd2 45%, #a0c8ff 100%);
+      background: linear-gradient(180deg, #153e64 0%, #719dd2 45%, #153e64 100%);
       background-attachment: fixed;
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     }
@@ -168,12 +168,20 @@
       height: 82px;
       object-fit: cover;
       border-radius: 24px;
-      margin: 0 auto 18px auto;
+      margin: 0 auto 1px auto;
       display: block;
     }
 
-    .login-header h1 {
-      font-size: 1.95rem;
+    .login-header
+
+    h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 1.5rem;
       font-weight: 800;
       color: #f8fafc;
       margin-bottom: 8px;
@@ -276,7 +284,8 @@
     <div class="login-card">
       <div class="login-header">
         <img src="clg_logo.png" alt="College Logo" class="college-logo">
-        <h1>Computer Science Department</h1>
+        <h1>Pub Kamrup College</h1>
+        <h2>Computer Science Department</h2>
         <p>Sign in to student attendance portal</p>
       </div>
 

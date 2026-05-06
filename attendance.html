@@ -89,31 +89,31 @@
           <div class="row gy-3">
             <div class="col-md-3">
               <label for="attBatch" class="form-label">Batch</label>
-              <select class="form-select" id="attBatch" onchange="updateAttCourseOptions()">
+              <select class="form-select" id="attBatch">
                 <option value="">Select a batch</option>
               </select>
             </div>
             <div class="col-md-3">
               <label for="attCourse" class="form-label">Course</label>
-              <select class="form-select" id="attCourse" onchange="updateAttSemesterOptions()">
+              <select class="form-select" id="attCourse">
                 <option value="">Select a course</option>
               </select>
             </div>
             <div class="col-md-3">
               <label for="attSemester" class="form-label">Semester</label>
-              <select class="form-select" id="attSemester" onchange="updateAttPaperOptions()" disabled>
+              <select class="form-select" id="attSemester" disabled>
                 <option value="">Select a semester</option>
               </select>
             </div>
             <div class="col-md-3">
               <label for="attPaper" class="form-label">Paper</label>
-              <select class="form-select" id="attPaper" onchange="loadStudentsForAttendance()" disabled>
+              <select class="form-select" id="attPaper" disabled>
                 <option value="">Select a paper</option>
               </select>
             </div>
             <div class="col-md-3">
               <label for="attendanceDate" class="form-label">Date</label>
-              <input type="date" class="form-control" id="attendanceDate" onchange="loadExistingAttendance()">
+              <input type="date" class="form-control" id="attendanceDate">
             </div>
           </div>
           <div class="row mt-3">
@@ -239,12 +239,12 @@
         const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
         const currentSemester = student.current_semester || student.semester || "N/A"
         const isActive = student.course_active !== false  // Default to true if not specified
-        const recordKey = `record_${Number(student.id)}`
+        const recordKey = `record_${student.id}`
         
         let statusHtml = ""
         if (isActive) {
           statusHtml = `
-            <select class="form-select form-select-sm" data-student-id="${Number(student.id)}" onchange="updateAttendanceStatus(${Number(student.id)}, this.value)">
+            <select class="form-select form-select-sm" data-student-id="${student.id}" onchange="updateAttendanceStatus('${student.id}', this.value)">
               <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
               <option value="late" ${(attendanceState[student.id] || "absent") === "late" ? "selected" : ""}>Late</option>
               <option value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "selected" : ""}>Absent</option>
@@ -304,7 +304,7 @@
       const semesterSelect = document.getElementById("attSemester")
       const paperSelect = document.getElementById("attPaper")
       
-      selectedCourseId = courseSelect.value ? Number(courseSelect.value) : null
+      selectedCourseId = courseSelect.value ? courseSelect.value : null
       selectedSemester = null
       selectedPaperId = null
       
@@ -370,7 +370,7 @@
 
     window.loadStudentsForAttendance = async function() {
       const paperSelect = document.getElementById("attPaper")
-      selectedPaperId = paperSelect.value ? Number(paperSelect.value) : null
+      selectedPaperId = paperSelect.value ? paperSelect.value : null
 
       if (!selectedBatch || !selectedCourseId || !selectedSemester || !selectedPaperId) {
         students = []
@@ -383,16 +383,30 @@
       document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Loading students...</td></tr>'
 
       try {
+        console.log('DEBUG: Starting loadStudentsForAttendance', { selectedBatch, selectedCourseId, selectedSemester, selectedPaperId })
+        
         // Fetch students for this batch only
         const allStudents = await window.apiRequest(`/students?admission_year=${selectedBatch}`)
-        students = allStudents.filter(student => 
-          student.course_id === selectedCourseId && 
-          student.semester === selectedSemester &&
-          (Array.isArray(student.papers) ? student.papers : JSON.parse(student.papers || "[]")).includes(selectedPaperId)
-        )
+        console.log('DEBUG: API returned students', allStudents.length)
+        
+        // Filter students by course and semester only (papers filter was too strict)
+        students = allStudents.filter(student => {
+          const courseMatch = String(student.course_id) === String(selectedCourseId)
+          const semesterMatch = Number(student.semester) === Number(selectedSemester)
+          const passes = courseMatch && semesterMatch
+          
+          if (!passes) {
+            console.log(`Student ${student.name}: course ${student.course_id} == ${selectedCourseId}? ${courseMatch}, semester ${student.semester} == ${selectedSemester}? ${semesterMatch}`)
+          }
+          return passes
+        })
+        
+        console.log('DEBUG: After filtering, students count:', students.length)
+        
         resetAttendanceState("absent")
         await loadExistingAttendance()
       } catch (error) {
+        console.error('Error in loadStudentsForAttendance:', error)
         document.getElementById("attendanceTable").innerHTML = '<tr><td colspan="5" class="text-center py-5 text-muted">Unable to load students.</td></tr>'
         setAlert(error.message || "Unable to load students right now.")
       }
@@ -569,7 +583,7 @@
       try {
         // Only submit attendance for students whose courses are still active
         const records = activeStudents.map(student => ({
-          student_id: Number(student.id),
+          student_id: student.id,
           date,
           subject: paperName,
           status: attendanceState[student.id] || "absent"
@@ -601,6 +615,52 @@
       window.setupSidebar()
       document.getElementById("attendanceDate").value = window.getTodayLocalDate()
       document.getElementById("searchStudent").addEventListener("input", applySearch)
+      
+      // Setup dropdown change handlers with proper error handling
+      document.getElementById("attBatch").addEventListener("change", async function() {
+        try {
+          await window.updateAttCourseOptions()
+        } catch (error) {
+          console.error("Error updating course options:", error)
+          setAlert("Error loading courses: " + error.message)
+        }
+      })
+      
+      document.getElementById("attCourse").addEventListener("change", async function() {
+        try {
+          await window.updateAttSemesterOptions()
+        } catch (error) {
+          console.error("Error updating semester options:", error)
+          setAlert("Error loading semesters: " + error.message)
+        }
+      })
+      
+      document.getElementById("attSemester").addEventListener("change", async function() {
+        try {
+          await window.updateAttPaperOptions()
+        } catch (error) {
+          console.error("Error updating paper options:", error)
+          setAlert("Error loading papers: " + error.message)
+        }
+      })
+      
+      document.getElementById("attPaper").addEventListener("change", async function() {
+        try {
+          await window.loadStudentsForAttendance()
+        } catch (error) {
+          console.error("Error loading students:", error)
+          setAlert("Error loading students: " + error.message)
+        }
+      })
+      
+      document.getElementById("attendanceDate").addEventListener("change", async function() {
+        try {
+          await loadExistingAttendance()
+        } catch (error) {
+          console.error("Error loading existing attendance:", error)
+        }
+      })
+      
       loadBatches()
     })
   </script>

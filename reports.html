@@ -83,26 +83,26 @@
           <div class="row gy-3">
             <div class="col-md-3">
               <label for="repBatch" class="form-label">Batch</label>
-              <select class="form-select" id="repBatch" onchange="updateRepCourseOptions()">
+              <select class="form-select" id="repBatch">
                 <option value="">Select a batch</option>
               </select>
             </div>
             <div class="col-md-3">
               <label for="repCourse" class="form-label">Course</label>
-              <select class="form-select" id="repCourse" onchange="updateRepSemesterOptions()">
+              <select class="form-select" id="repCourse">
                 <option value="">All Courses</option>
               </select>
             </div>
             <div class="col-md-3">
-              <label for="repSemester" class="form-label">Semester</label>
-              <select class="form-select" id="repSemester" onchange="updateRepPaperOptions()" disabled>
-                <option value="">All Semesters</option>
+              <label for="repSemester" class="form-label">Semester <span class="text-danger">*</span></label>
+              <select class="form-select" id="repSemester" disabled>
+                <option value="">Select a semester</option>
               </select>
             </div>
             <div class="col-md-3">
-              <label for="repPaper" class="form-label">Paper</label>
+              <label for="repPaper" class="form-label">Paper <span class="text-danger">*</span></label>
               <select class="form-select" id="repPaper" disabled>
-                <option value="">All Papers</option>
+                <option value="">Select a paper</option>
               </select>
             </div>
           </div>
@@ -391,9 +391,9 @@
       
       courseSelect.innerHTML = '<option value="">All Courses</option>'
       semesterSelect.disabled = true
-      semesterSelect.innerHTML = '<option value="">All Semesters</option>'
+      semesterSelect.innerHTML = '<option value="">Select a semester</option>'
       paperSelect.disabled = true
-      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
       
       if (!selectedBatch) {
         return
@@ -427,14 +427,14 @@
       const semesterSelect = document.getElementById("repSemester")
       const paperSelect = document.getElementById("repPaper")
       
-      selectedCourseId = courseSelect.value ? Number(courseSelect.value) : null
+      selectedCourseId = courseSelect.value ? String(courseSelect.value) : null
       selectedSemester = null
       selectedPaperId = null
       
       semesterSelect.disabled = !selectedCourseId
-      semesterSelect.innerHTML = '<option value="">All Semesters</option>'
+      semesterSelect.innerHTML = '<option value="">Select a semester</option>'
       paperSelect.disabled = true
-      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
       
       if (!selectedCourseId) {
         return
@@ -461,7 +461,7 @@
       selectedPaperId = null
       
       paperSelect.disabled = !selectedCourseId || !selectedSemester
-      paperSelect.innerHTML = '<option value="">All Papers</option>'
+      paperSelect.innerHTML = '<option value="">Select a paper</option>'
       
       if (!selectedCourseId || !selectedSemester) {
         return
@@ -479,6 +479,11 @@
         setAlert("Unable to load papers for this course/semester.")
         allPapers = []
       }
+    }
+
+    window.updateRepPaperSelection = function() {
+      const paperSelect = document.getElementById("repPaper")
+      selectedPaperId = paperSelect.value || null
     }
 
     function displayReport() {
@@ -649,6 +654,8 @@
 
       const startDate = document.getElementById("startDate").value
       const endDate = document.getElementById("endDate").value
+      const semesterSelect = document.getElementById("repSemester")
+      const paperSelect = document.getElementById("repPaper")
 
       if (!startDate || !endDate) {
         setAlert("Please select both a start date and an end date.")
@@ -657,6 +664,16 @@
 
       if (startDate > endDate) {
         setAlert("Start date cannot be later than end date.")
+        return
+      }
+
+      if (!semesterSelect.value) {
+        setAlert("Please select a semester.")
+        return
+      }
+
+      if (!paperSelect.value) {
+        setAlert("Please select a paper.")
         return
       }
 
@@ -689,20 +706,12 @@
         
         // Filter by semester if selected
         if (selectedSemester) {
-          filteredStudents = filteredStudents.filter(s => s.semester === selectedSemester)
-        }
-        
-        // Filter by paper if selected
-        if (selectedPaperId) {
-          filteredStudents = filteredStudents.filter(s => {
-            const papers = Array.isArray(s.papers) ? s.papers : JSON.parse(s.papers || "[]")
-            return papers.includes(selectedPaperId)
-          })
+          filteredStudents = filteredStudents.filter(s => s.current_semester === selectedSemester)
         }
 
         reportData = filteredStudents.map(student => {
           const courseName = courses.find(c => c.id === student.course_id)?.name || "Unknown"
-          let studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(student.id))
+          let studentAttendance = filteredAttendance.filter(record => String(record.student_id) === String(student.id))
           
           // Filter attendance by paper if selected
           if (selectedPaperId) {
@@ -967,7 +976,7 @@
         })
 
         // Filter attendance for this student
-        let studentAttendance = filteredAttendance.filter(record => Number(record.student_id) === Number(selectedStudent.id))
+        let studentAttendance = filteredAttendance.filter(record => String(record.student_id) === String(selectedStudent.id))
 
         // Store selected paper ID if one is chosen
         selectedStudentPaperId = paperSelect.value ? Number(paperSelect.value) : null
@@ -1093,6 +1102,35 @@
       resetFilters()
       await loadBatches()
       await loadInitialData()
+
+      // Add event listeners for dropdowns to properly await async functions
+      document.getElementById("repBatch").addEventListener("change", async function() {
+        try {
+          await window.updateRepCourseOptions()
+        } catch (error) {
+          setAlert("Error loading courses: " + error.message)
+        }
+      })
+
+      document.getElementById("repCourse").addEventListener("change", async function() {
+        try {
+          await window.updateRepSemesterOptions()
+        } catch (error) {
+          setAlert("Error loading semesters: " + error.message)
+        }
+      })
+
+      document.getElementById("repSemester").addEventListener("change", async function() {
+        try {
+          await window.updateRepPaperOptions()
+        } catch (error) {
+          setAlert("Error loading papers: " + error.message)
+        }
+      })
+
+      document.getElementById("repPaper").addEventListener("change", function() {
+        window.updateRepPaperSelection()
+      })
     })
   </script>
 </body>
