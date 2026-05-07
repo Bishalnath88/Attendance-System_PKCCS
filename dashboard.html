@@ -271,7 +271,7 @@
         const presentStudentIds = new Set(
           todayRecords
             .filter(record => record.status === "present" || record.status === "late")
-            .map(record => Number(record.student_id))
+            .map(record => record.student_id)
         )
 
         const presentCount = presentStudentIds.size
