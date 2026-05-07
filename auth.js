@@ -312,6 +312,7 @@ function escapeHtml(value) {
 }
 
 window.API_BASE_URL = API_BASE_URL;
+window.apiRequest = apiRequest;
 /**
  * Custom Modal Handler - Replaces Bootstrap Modal
  * Provides show/hide functionality for modals without Bootstrap

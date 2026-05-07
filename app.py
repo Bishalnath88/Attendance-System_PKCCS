@@ -96,8 +96,9 @@ def handle_exception(error):
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Session timeout duration in hours
 SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "24"))
-# JWT secret key - use environment variable or generate random one for testing
-JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
+# JWT secret key - prefer environment variable, otherwise use a stable fallback
+# so tokens remain valid across Render restarts.
+JWT_SECRET = os.environ.get("JWT_SECRET", "pkccs-attendance-system-jwt-secret-v1")
 
 
 def json_error(message, status_code=400):
