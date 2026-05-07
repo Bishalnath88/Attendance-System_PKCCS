@@ -10,22 +10,24 @@
 function resolveApiBaseUrl() {
   const localDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
+  // Try to use window.__API_BASE_URL__ from config.js first
   if (typeof window.__API_BASE_URL__ === "string" && window.__API_BASE_URL__.trim()) {
     return window.__API_BASE_URL__.trim().replace(/\/$/, "");
   }
 
+  // Try meta tag
   const metaTag = document.querySelector('meta[name="api-base-url"]');
   if (metaTag && metaTag.content && metaTag.content.trim()) {
     return metaTag.content.trim().replace(/\/$/, "");
   }
 
+  // Local development fallback
   if (localDev) {
     return `http://${window.location.hostname}:5000`;
   }
 
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? `http://${window.location.hostname}:5000`
-    : "";
+  // Production fallback - use Render URL directly
+  return "https://attendance-system-pkccs.onrender.com";
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
