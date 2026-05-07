@@ -8,6 +8,14 @@ output_path = root_dir / "config.js"
 # DEPLOYMENT_URL is kept for compatibility with older env files, but it should
 # point to the same backend API host if it is used at all.
 api_base_url = (os.environ.get("API_BASE_URL") or os.environ.get("DEPLOYMENT_URL") or "").strip()
+
+# On Netlify, the API URL must be set explicitly. Falling back to localhost in
+# production causes the deployed site to call the user's own machine.
+if os.environ.get("NETLIFY") == "true" and not api_base_url:
+	raise SystemExit(
+		"API_BASE_URL is required during Netlify builds. Set it to your Render backend URL."
+	)
+
 resolved_base_url = api_base_url or "http://localhost:5000"
 
 output_path.write_text(f'window.__API_BASE_URL__ = {resolved_base_url!r};\n', encoding="utf-8")
