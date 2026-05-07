@@ -23,6 +23,7 @@ import json
 import os
 import re
 import secrets
+import jwt
 
 from flask import Flask, g, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -94,9 +95,9 @@ def handle_exception(error):
 # EMAIL REGEX PATTERN - validates email format
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Session timeout duration in hours
-SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
-# In-memory token storage for active sessions
-ACTIVE_TOKENS = {}
+SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "24"))
+# JWT secret key - use environment variable or generate random one for testing
+JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 
 
 def json_error(message, status_code=400):
@@ -231,54 +232,50 @@ def is_hashed_password(password):
 
 
 # ========== SESSION & TOKEN MANAGEMENT ==========
-def prune_expired_tokens():
-    # Remove expired session tokens from memory
-    now = datetime.utcnow()
-    expired_tokens = [
-        token for token, session in ACTIVE_TOKENS.items()
-        if session["expires_at"] <= now
-    ]
-    for token in expired_tokens:
-        ACTIVE_TOKENS.pop(token, None)
-
-
 def issue_token(user):
-    # Generate and store new session token for user
-    prune_expired_tokens()
-    token = secrets.token_urlsafe(32)
-    ACTIVE_TOKENS[token] = {
+    """Generate JWT token for user"""
+    payload = {
         "user_id": user.get("id"),
         "email": user["email"],
-        "expires_at": datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS),
+        "exp": datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS),
+        "iat": datetime.utcnow(),
     }
-    return token
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
 
 def get_bearer_token():
-    # Extract Bearer token from Authorization header
+    """Extract Bearer token from Authorization header"""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
     return auth_header.split(" ", 1)[1].strip() or None
 
 
+def verify_token(token):
+    """Verify JWT token and return payload"""
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
 def require_auth(view):
-    # Decorator to require authentication for protected endpoints
-    # Verifies token validity and extends session timeout
+    """Decorator to require authentication for protected endpoints"""
     @wraps(view)
     def wrapped_view(*args, **kwargs):
-        prune_expired_tokens()
         token = get_bearer_token()
-        session = ACTIVE_TOKENS.get(token)
-
-        if not token or not session:
+        if not token:
             return json_error("Authentication required.", 401)
-
-        # Extend session timeout on each request
-        session["expires_at"] = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
+        
+        payload = verify_token(token)
+        if not payload:
+            return json_error("Invalid or expired token.", 401)
+        
         g.auth_token = token
-        g.user_id = session.get("user_id")
-        g.user_email = session["email"]
+        g.user_id = payload.get("user_id")
+        g.user_email = payload["email"]
         return view(*args, **kwargs)
 
     return wrapped_view
@@ -536,9 +533,8 @@ def login():
 @app.route("/logout", methods=["POST"])
 @require_auth
 def logout():
-    # User logout - invalidate session token - POST /logout
-    # Remove token from active sessions
-    ACTIVE_TOKENS.pop(g.auth_token, None)
+    # User logout - with JWT, nothing to invalidate server-side
+    # Client should clear localStorage token
     return jsonify({"message": "Logged out successfully."})
 
 
