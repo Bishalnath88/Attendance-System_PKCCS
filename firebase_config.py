@@ -8,9 +8,14 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 import os
 from pathlib import Path
+import json
 
 # Path to service account key
 SERVICE_ACCOUNT_KEY_PATH = Path(__file__).resolve().parent / "serviceAccountKey.json"
+
+# Environment variable that may contain the raw JSON service account
+# Use this in production to avoid committing the JSON file to the repo.
+SERVICE_ACCOUNT_JSON_ENV = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 
 def initialize_firebase():
     """
@@ -24,14 +29,26 @@ def initialize_firebase():
     Returns: Firestore database instance
     """
     
-    # Check if credentials file exists
+    # Prefer JSON provided via environment variable (for hosted deployments)
+    if SERVICE_ACCOUNT_JSON_ENV:
+        try:
+            sa_dict = json.loads(SERVICE_ACCOUNT_JSON_ENV)
+        except Exception as exc:
+            raise ValueError("Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON environment variable") from exc
+
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(sa_dict)
+            firebase_admin.initialize_app(cred)
+        return firestore.client()
+
+    # Fallback to loading credentials file from disk for local development
     if not SERVICE_ACCOUNT_KEY_PATH.exists():
         raise FileNotFoundError(
             f"Service account key not found at: {SERVICE_ACCOUNT_KEY_PATH}\n"
-            "Please download it from Firebase Console > Project Settings > Service Accounts\n"
-            "and place it in the project root as 'serviceAccountKey.json'"
+            "For production deployments set the GOOGLE_SERVICE_ACCOUNT_JSON environment variable with the service account JSON.\n"
+            "For local development you can place 'serviceAccountKey.json' in the project root."
         )
-    
+
     # Initialize Firebase (only once)
     if not firebase_admin._apps:
         cred = credentials.Certificate(str(SERVICE_ACCOUNT_KEY_PATH))

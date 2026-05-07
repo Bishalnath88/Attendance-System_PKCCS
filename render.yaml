@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: pkccs-attendance-system
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    autoDeploy: true
+    envVars:
+      - key: FLASK_HOST
+        value: 0.0.0.0
+      - key: FLASK_PORT
+        value: 10000
+      - key: FLASK_DEBUG
+        value: 0
+      - key: SESSION_TTL_HOURS
+        value: 12
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false

@@ -7,10 +7,32 @@
  * ========================================
  */
 
-// API endpoint base URL - uses local server or Railway deployment based on environment
-const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? `http://${window.location.hostname}:5000`
-  : "https://attendance-systempkccs-production.up.railway.app";
+function resolveApiBaseUrl() {
+  const localDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+  if (typeof window.__API_BASE_URL__ === "string" && window.__API_BASE_URL__.trim()) {
+    return window.__API_BASE_URL__.trim().replace(/\/$/, "");
+  }
+
+  const metaTag = document.querySelector('meta[name="api-base-url"]');
+  if (metaTag && metaTag.content && metaTag.content.trim()) {
+    return metaTag.content.trim().replace(/\/$/, "");
+  }
+
+  if (localDev) {
+    return `http://${window.location.hostname}:5000`;
+  }
+
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? `http://${window.location.hostname}:5000`
+    : "";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
+if (!API_BASE_URL) {
+  console.warn("API_BASE_URL could not be resolved. Set window.__API_BASE_URL__ or a meta tag named api-base-url.");
+}
 
 /**
  * Get stored authentication token from localStorage
