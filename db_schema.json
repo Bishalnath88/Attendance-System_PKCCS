@@ -1,0 +1,271 @@
+{
+  "database": "Attendance System",
+  "type": "MySQL",
+  "tables": [
+    {
+      "tableName": "users",
+      "description": "User accounts (login credentials)",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "email",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL, UNIQUE",
+          "nullable": false
+        },
+        {
+          "fieldName": "password",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        },
+        {
+          "fieldName": "updated_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "indexes": ["idx_users_email"]
+    },
+    {
+      "tableName": "courses",
+      "description": "Courses/Programs (B.Tech, BBA, etc.)",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "name",
+          "dataType": "VARCHAR(100)",
+          "constraints": "NOT NULL, UNIQUE",
+          "nullable": false
+        },
+        {
+          "fieldName": "code",
+          "dataType": "VARCHAR(50)",
+          "constraints": "NOT NULL, UNIQUE",
+          "nullable": false
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "indexes": ["idx_name"]
+    },
+    {
+      "tableName": "course_semesters",
+      "description": "Semesters offered in each course",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "course_id",
+          "dataType": "INT",
+          "constraints": "FOREIGN KEY → courses.id (ON DELETE CASCADE)",
+          "nullable": false
+        },
+        {
+          "fieldName": "semester",
+          "dataType": "INT",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "uniqueConstraints": ["UNIQUE(course_id, semester)"]
+    },
+    {
+      "tableName": "papers",
+      "description": "Papers/Subjects in each semester",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "course_id",
+          "dataType": "INT",
+          "constraints": "FOREIGN KEY → courses.id (ON DELETE CASCADE)",
+          "nullable": false
+        },
+        {
+          "fieldName": "semester",
+          "dataType": "INT",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "name",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "code",
+          "dataType": "VARCHAR(50)",
+          "constraints": "OPTIONAL",
+          "nullable": true
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "uniqueConstraints": ["UNIQUE(course_id, semester, name)"]
+    },
+    {
+      "tableName": "students",
+      "description": "Student details with enrollment info",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "name",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "roll",
+          "dataType": "VARCHAR(50)",
+          "constraints": "NOT NULL, UNIQUE",
+          "nullable": false
+        },
+        {
+          "fieldName": "course_id",
+          "dataType": "INT",
+          "constraints": "FOREIGN KEY → courses.id (ON DELETE RESTRICT)",
+          "nullable": false
+        },
+        {
+          "fieldName": "semester",
+          "dataType": "INT",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "admission_year",
+          "dataType": "INT",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "papers",
+          "dataType": "JSON",
+          "constraints": "JSON array of paper IDs",
+          "nullable": true
+        },
+        {
+          "fieldName": "email",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL, UNIQUE",
+          "nullable": false
+        },
+        {
+          "fieldName": "phone",
+          "dataType": "VARCHAR(20)",
+          "constraints": "OPTIONAL",
+          "nullable": true
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        },
+        {
+          "fieldName": "updated_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "indexes": ["idx_roll", "idx_email", "idx_course_id", "idx_semester", "idx_admission_year"]
+    },
+    {
+      "tableName": "attendance",
+      "description": "Attendance records (present/absent/late)",
+      "fields": [
+        {
+          "fieldName": "id",
+          "dataType": "INT",
+          "constraints": "PRIMARY KEY, AUTO_INCREMENT",
+          "nullable": false
+        },
+        {
+          "fieldName": "student_id",
+          "dataType": "INT",
+          "constraints": "FOREIGN KEY → students.id (ON DELETE CASCADE)",
+          "nullable": false
+        },
+        {
+          "fieldName": "date",
+          "dataType": "DATE",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "subject",
+          "dataType": "VARCHAR(255)",
+          "constraints": "NOT NULL",
+          "nullable": false
+        },
+        {
+          "fieldName": "status",
+          "dataType": "ENUM('present', 'absent', 'late')",
+          "constraints": "DEFAULT 'absent'",
+          "nullable": false
+        },
+        {
+          "fieldName": "created_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false
+        },
+        {
+          "fieldName": "updated_at",
+          "dataType": "TIMESTAMP",
+          "constraints": "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "nullable": false
+        }
+      ],
+      "uniqueConstraints": ["UNIQUE(student_id, date, subject)"],
+      "indexes": ["idx_date", "idx_subject", "idx_student_id", "idx_attendance_student_date"]
+    }
+  ]
+}
