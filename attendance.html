@@ -244,18 +244,38 @@
         let statusHtml = ""
         if (isActive) {
           statusHtml = `
-            <select class="form-select form-select-sm" data-student-id="${student.id}" onchange="updateAttendanceStatus('${student.id}', this.value)">
-              <option value="present" ${(attendanceState[student.id] || "absent") === "present" ? "selected" : ""}>Present</option>
-              <option value="late" ${(attendanceState[student.id] || "absent") === "late" ? "selected" : ""}>Late</option>
-              <option value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "selected" : ""}>Absent</option>
-            </select>`
+            <div class="attendance-radio-group d-flex gap-3 flex-wrap" data-student-id="${student.id}">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="status_${student.id}" id="present_${student.id}" value="present" ${(attendanceState[student.id] || "absent") === "present" ? "checked" : ""} onchange="updateAttendanceStatus('${student.id}', this.value)">
+                <label class="form-check-label" for="present_${student.id}">Present</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="status_${student.id}" id="late_${student.id}" value="late" ${(attendanceState[student.id] || "absent") === "late" ? "checked" : ""} onchange="updateAttendanceStatus('${student.id}', this.value)">
+                <label class="form-check-label" for="late_${student.id}">Late</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="status_${student.id}" id="absent_${student.id}" value="absent" ${(attendanceState[student.id] || "absent") === "absent" ? "checked" : ""} onchange="updateAttendanceStatus('${student.id}', this.value)">
+                <label class="form-check-label" for="absent_${student.id}">Absent</label>
+              </div>
+            </div>`
         } else {
           const endDate = student.course_end_date ? window.formatDate(student.course_end_date) : "N/A"
           statusHtml = `
             <div class="d-flex gap-2 align-items-center">
-              <select class="form-select form-select-sm" disabled>
-                <option value="absent">Absent</option>
-              </select>
+              <div class="attendance-radio-group d-flex gap-3 flex-wrap" style="opacity: 0.5; pointer-events: none;">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="status_${student.id}" id="present_${student.id}" value="present" disabled>
+                  <label class="form-check-label" for="present_${student.id}">Present</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="status_${student.id}" id="late_${student.id}" value="late" disabled>
+                  <label class="form-check-label" for="late_${student.id}">Late</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="status_${student.id}" id="absent_${student.id}" value="absent" disabled checked>
+                  <label class="form-check-label" for="absent_${student.id}">Absent</label>
+                </div>
+              </div>
               <span class="badge bg-secondary" title="Course ended on ${endDate}">Ended</span>
             </div>`
         }
